@@ -5986,14 +5986,77 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     } else { try { raw = localStorage.getItem(LS); } catch (e) {} }
   } catch (e) {}
-  K.fetchJson = function (url) {
+  function dec(url, k) {
     return fetch(url).then(function (r) {
       if (!r.ok) { var e = new Error('файл ' + url + ': ' + r.status); e.net = true; throw e; }
       return r.arrayBuffer();
     }, function (e) { e.net = true; throw e; }).then(function (buf) {
-      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(buf, 0, 12) }, key, new Uint8Array(buf, 12));
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(buf, 0, 12) }, k, new Uint8Array(buf, 12));
     }).then(function (pt) { return JSON.parse(new TextDecoder().decode(pt)); });
-  };
+  }
+  K.fetchJson = function (url) { return dec(url, key); };
+  /* ключ із вставленого тексту: або саме посилання з «k=…», або лише ключ */
+  function pick(t) {
+    t = String(t || '').replace(/\s+/g, '');
+    var m = /k=([A-Za-z0-9_-]{43})(?![A-Za-z0-9_-])/.exec(t) || /^([A-Za-z0-9_-]{43})=?$/.exec(t);
+    return m ? m[1] : null;
+  }
+  function check(r) {
+    if (!window.crypto || !crypto.subtle || !window.TextDecoder) return Promise.resolve('nocrypto');
+    var b; try { b = bytes(r); } catch (e) { b = null; }
+    if (!b || b.length !== 32) return Promise.resolve('bad');
+    return crypto.subtle.importKey('raw', b, { name: 'AES-GCM' }, false, ['decrypt']).then(function (k) { return dec('d/b.enc', k); })
+      .then(function () { return 'open'; }, function (e) { return e && e.net ? 'offline' : 'bad'; });
+  }
+  function link() { return location.origin + location.pathname + '#k=' + raw; }
+  function dlg(mode) {
+    var old = document.getElementById('keydlg'); if (old) old.remove();
+    var B = 'padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:15px;font-weight:600';
+    var o = document.createElement('div'); o.id = 'keydlg'; o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true');
+    o.style.cssText = 'position:fixed;inset:0;z-index:99;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px';
+    o.innerHTML = '<div style="background:var(--panel);color:var(--ink);border-radius:var(--r);box-shadow:var(--shadow);padding:16px;width:100%;max-width:440px">' +
+      '<h2 style="margin:0 0 8px;font-size:18px">' + (mode === 'share' ? 'Посилання з ключем' : 'Ввести ключ') + '</h2>' +
+      '<p style="margin:0 0 10px;color:var(--ink2);font-size:14px">' + (mode === 'share' ? 'Хто відкриє це посилання, побачить усі дані. Надсилайте його лише правлінню та бухгалтерії.' : 'Вставте сюди ключ або все посилання з ключем, яке надіслало правління.') + '</p>' +
+      '<input id="keyin" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"' + (mode === 'share' ? ' readonly' : ' placeholder="ключ або посилання"') + ' aria-label="' + (mode === 'share' ? 'Посилання з ключем' : 'Ключ або посилання з ключем') + '" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);font-size:16px">' +
+      '<p id="keymsg" role="status" style="margin:8px 0 0;min-height:19px;color:var(--ink2);font-size:14px"></p>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button id="keyno" type="button" style="' + B + '">' + (mode === 'share' ? 'Закрити' : 'Скасувати') + '</button>' +
+      '<button id="keyok" type="button" style="' + B + ';background:var(--amber);color:#1c2226;border-color:var(--amber)">' + (mode === 'share' ? 'Скопіювати' : 'Відкрити') + '</button></div></div>';
+    document.body.appendChild(o);
+    var inp = document.getElementById('keyin'), msg = document.getElementById('keymsg'), ok = document.getElementById('keyok');
+    var close = function () { o.remove(); };
+    document.getElementById('keyno').onclick = close;
+    o.addEventListener('click', function (e) { if (e.target === o) close(); });
+    o.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); else if (e.key === 'Enter' && mode !== 'share') ok.click(); });
+    if (mode === 'share') {
+      inp.value = link();
+      ok.onclick = function () {
+        inp.focus(); inp.select(); try { inp.setSelectionRange(0, inp.value.length); } catch (e) {}
+        var fin = function (y) { msg.textContent = y ? 'Скопійовано. Вставте в повідомлення.' : 'Не вдалося скопіювати — виділіть і скопіюйте рядок вручну.'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inp.value).then(function () { fin(true); }, function () { var y = false; try { y = document.execCommand('copy'); } catch (e) {} fin(y); });
+        else { var y = false; try { y = document.execCommand('copy'); } catch (e) {} fin(y); }
+      };
+      return;
+    }
+    try { inp.focus(); } catch (e) {}
+    ok.onclick = function () {
+      var r = pick(inp.value);
+      if (!r) { msg.textContent = 'Це не схоже на ключ. Вставте ключ або посилання повністю, без пропусків.'; return; }
+      ok.disabled = true; msg.textContent = 'Перевіряю…';
+      check(r).then(function (st) {
+        ok.disabled = false;
+        if (st !== 'open') { msg.textContent = st === 'bad' ? 'Ключ не підійшов. Перевірте, чи його скопійовано повністю.' : st === 'offline' ? 'Дані не завантажилися — перевірте звʼязок і спробуйте ще раз.' : 'Цей браузер не вміє розшифровувати дані. Відкрийте сторінку в актуальному Safari або Chrome.'; return; }
+        msg.textContent = 'Ключ підійшов. Відкриваю…';
+        try { localStorage.setItem(LS, r); } catch (e) {}
+        location.hash = 'k=' + r; location.reload();
+      });
+    };
+  }
+  K.enter = function () { dlg('enter'); };
+  K.share = function () { if (K.open) dlg('share'); };
+  document.addEventListener('click', function (e) {
+    var t = e.target && e.target.closest && e.target.closest('[data-keyenter],[data-keyshare]'); if (!t) return;
+    e.preventDefault(); e.stopPropagation(); dlg(t.hasAttribute('data-keyshare') && K.open ? 'share' : 'enter');
+  }, true);
   K.forget = function () { try { localStorage.removeItem(LS); } catch (e) {} location.reload(); };
   function toast(t) {
     var el = document.getElementById('toast'); if (!el) return;
@@ -6001,12 +6064,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   }
   function ui() {
     var body = document.getElementById('engbody'); if (!body || document.getElementById('keystate')) return;
-    var txt = { open: 'Дані мешканців відкрито ключем, збереженим на цьому пристрої.', none: 'Дані мешканців закрито. Вони відкриваються за посиланням із ключем від правління.',
-      bad: 'Ключ із посилання не підійшов. Показано лише модель будинку.', offline: 'Ключ є, але дані не завантажилися. Перевірте звʼязок і оновіть сторінку.',
+    var txt = { open: 'Дані відкрито ключем, збереженим на цьому пристрої. Після відкриття ключ зникає з адресного рядка — щоб передати доступ, беріть посилання кнопкою нижче, а не з адресного рядка.', none: 'Дані закрито. Вони відкриваються за посиланням із ключем від правління або ключем, введеним вручну.',
+      bad: 'Ключ не підійшов. Показано лише модель будинку.', offline: 'Ключ є, але дані не завантажилися. Перевірте звʼязок і оновіть сторінку.',
       nocrypto: 'Цей браузер не вміє розшифровувати дані. Відкрийте сторінку в актуальному Safari або Chrome.' }[K.state];
     var d = document.createElement('div');
     d.innerHTML = '<h2>Доступ до даних</h2><p class="muted" id="keystate" style="margin:0 0 8px">' + txt + '</p>' +
-      (K.state === 'open' || K.state === 'offline' ? '<div class="grid"><button id="keyforget" type="button" style="grid-column:span 2">Забути ключ на цьому пристрої</button></div>' : '');
+      (K.state === 'open' ? '<div class="grid"><button type="button" data-keyshare="1" style="grid-column:span 2">Посилання з ключем — скопіювати</button><button id="keyforget" type="button" style="grid-column:span 2">Забути ключ на цьому пристрої</button></div>'
+        : K.state === 'offline' ? '<div class="grid"><button id="keyforget" type="button" style="grid-column:span 2">Забути ключ на цьому пристрої</button></div>'
+        : K.state === 'nocrypto' ? '' : '<div class="grid"><button type="button" data-keyenter="1" style="grid-column:span 2">Ввести ключ</button></div>');
     body.insertBefore(d, body.firstChild);
     var f = document.getElementById('keyforget'); if (f) f.onclick = K.forget;
   }
@@ -6073,7 +6138,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   function dmy(s) { return s ? s.split('-').reverse().join('.') : ''; }
   var MS = { '01': 'Січ', '02': 'Лют', '03': 'Бер', '04': 'Кві', '05': 'Тра', '06': 'Чер', '07': 'Лип', '08': 'Сер', '09': 'Вер', '10': 'Жов', '11': 'Лис', '12': 'Гру' };
   function ULK() { return !!(window.AtlasKey && window.AtlasKey.open); }
-  var LOCKMSG = 'Відкривається за посиланням із ключем від правління.';
+  var LOCKMSG = 'Відкривається за посиланням із ключем від правління.<br><button type="button" data-keyenter="1" style="margin-top:8px;padding:8px 14px;border-radius:10px;border:1px solid var(--amber);background:var(--amber);color:#1c2226;font:inherit;font-weight:700">Ввести ключ</button>';
   function unitByKey(key) { var f = KF[key]; return f != null && data[f] ? data[f].units[key] : null; }
 
   /* ---------- розрахунки ---------- */
