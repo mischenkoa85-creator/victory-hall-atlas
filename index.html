@@ -373,6 +373,8 @@ body.xr-pick #c{cursor:crosshair}
 #xrpanel .own .no{color:var(--ink2)}
 #xrpanel .xact{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
 body.xr-col #sheet{visibility:hidden}
+#rail button.xg{background:transparent;border-color:var(--amber);color:var(--amber);box-shadow:inset 0 0 0 1.5px var(--amber)}
+body.xr-part #rail button.all.on{background:#e8ebe8;border-color:#e8ebe8;box-shadow:none}
 </style>
 <canvas id="c" aria-label="3D-модель будинку"></canvas>
 
@@ -6019,6 +6021,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 (function () {
   'use strict';
   var A = null, on = false, nets = 0, col = null, colP = null, GH = null, picking = false, C = null, MK = null, prevOn = null, mini = false;
+  var GS = {}, AUTO = {}, lastSel = '', own = false, savedGS = null;   /* GS — поверхи, показані прозорими; own — зміну набору поверхів зробив цей модуль */
   var dcache = {};
   var NET = { water: 1, fit: 1, sewer: 1, elec: 1, power: 1, fiber: 1, equip: 1 };   /* що лишається непрозорим */
   var HIDE = { eldev: 1, lights: 1, lights_em: 1 };                                    /* дрібне обладнання в прозорому режимі не показуємо */
@@ -6036,7 +6039,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     var T = A.T;
     GH = {
       mesh: new T.MeshBasicMaterial({ color: 0x8ea4b3, transparent: true, opacity: 0.06, depthWrite: false, side: 2, forceSinglePass: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
-      line: new T.LineBasicMaterial({ color: 0x4d5f6b, transparent: true, opacity: 0.42, depthWrite: false })
+      line: new T.LineBasicMaterial({ color: 0x4d5f6b, transparent: true, opacity: 0.42, depthWrite: false }),
+      /* поодинокий прозорий поверх: шарів мало, тож заливка помітніша, ніж у всього будинку */
+      one: new T.MeshBasicMaterial({ color: 0x8ea4b3, transparent: true, opacity: 0.13, depthWrite: false, side: 2, forceSinglePass: true, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }),
+      oneLine: new T.LineBasicMaterial({ color: 0x4d5f6b, transparent: true, opacity: 0.5, depthWrite: false })
     };
     return GH;
   }
@@ -6050,11 +6056,35 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     var pvf = !!st.layer.pvf;
     return !((u.ts === 'on' && !pvf) || (u.ts === 'off' && pvf));
   }
+  function gsCount() { var n = 0, k; for (k in GS) n++; return n; }
+  /* поверхи одразу над заданим: найближча вища відмітка (дах стилобата і 5-й поверх мають одну) */
+  function aboveOf(f) {
+    var F = A.floors, z = F[f] ? F[f].z : null, best = Infinity, out = [], k;
+    if (z === null) return out;
+    for (k in F) if (F[k].z > z + 0.5 && F[k].z < best - 0.01) best = F[k].z;
+    for (k in F) if (Math.abs(F[k].z - best) < 0.01) out.push(+k);
+    return out;
+  }
+  /* набір відкритих поверхів змінився не з кнопок цього модуля — підлаштовуємо прозорі */
+  function trackSel() {
+    var st = A.state, key = st.sel.slice().sort().join(',');
+    if (key === lastSel) return;
+    var prev = {}, cur = {}; (lastSel ? lastSel.split(',') : []).forEach(function (f) { prev[f] = 1; });
+    st.sel.forEach(function (f) { cur[f] = 1; delete GS[f]; });
+    if (on && !own && !C) {
+      if (!st.sel.length) { GS = {}; AUTO = {}; }                                /* «Увесь будинок» — знову прозорий цілком */
+      else st.sel.forEach(function (f) { if (!prev[f]) aboveOf(f).forEach(function (g) { if (!cur[g] && !GS[g]) { GS[g] = 2; (AUTO[f] = AUTO[f] || []).push(g); } }); });
+    }
+    lastSel = key;
+  }
   /* викликається одразу після того, як модель розставила видимість */
   function applyVis() {
     if (!A) return;
+    trackSel();
     var st = A.state, sel = {}, G = on ? ghost() : null, name, ch, i, m, u;
     st.sel.forEach(function (f) { sel[f] = 1; });
+    var part = on && (st.sel.length > 0 || gsCount() > 0);       /* прозорі лише вибрані поверхи, а не весь будинок */
+    var gs = function (u) { return GS[u.fl] || (u.fl2 >= 0 && GS[u.fl2]); };
     for (name in A.chunks) {
       ch = A.chunks[name];
       var isShell = name === 'shell', isNets = name === 'nets';
@@ -6063,17 +6093,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         if (isNets) { m.visible = on && !sel[u.fl] && layOk(u, st); continue; }
         if (!on) { swap(m, null); continue; }
         if (!isShell) continue;                              /* блоки відкритих поверхів — як є */
-        if (u.whole) { m.visible = layOk(u, st) && !HIDE[u.g]; swap(m, NET[u.g] ? null : G.mesh); }
+        if (u.whole) { m.visible = layOk(u, st) && !HIDE[u.g] && (!part || !!NET[u.g]); swap(m, NET[u.g] ? null : G.mesh); }
         else if (NET[u.g]) m.visible = false;                /* мережі оболонки вже намальовано цілим блоком */
+        else if (part && !sel[u.fl] && !(u.fl2 >= 0 && sel[u.fl2])) { var g1 = gs(u) && layOk(u, st) && !HIDE[u.g]; m.visible = !!g1; swap(m, g1 ? G.one : null); }
         else swap(m, null);
       }
       for (i = 0; i < ch.lines.length; i++) {
         m = ch.lines[i]; u = m.userData;
         if (!on) { swap(m, null); continue; }
-        if (isShell && u.whole) { m.visible = layOk(u, st) && !NET[u.g]; swap(m, G.line); }
+        if (!isShell) continue;
+        if (u.whole) { m.visible = !part && layOk(u, st) && !NET[u.g]; swap(m, G.line); }
+        else if (part && !sel[u.fl] && !(u.fl2 >= 0 && sel[u.fl2])) { var g2 = gs(u) && !u.edge && layOk(u, st) && !NET[u.g] && !HIDE[u.g]; m.visible = !!g2; swap(m, g2 ? G.oneLine : null); }
+        else swap(m, null);
       }
     }
+    syncRail();
   }
+  /* кнопки поверхів: обвідка — прозорий поверх */
+  function syncRail() {
+    var bs = document.querySelectorAll('#rail [data-floor]'), i, f, part = on && gsCount() > 0;
+    for (i = 0; i < bs.length; i++) { f = bs[i].getAttribute('data-floor'); bs[i].classList.toggle('xg', on && f !== 'all' && !!GS[+f]); }
+    document.body.classList.toggle('xr-part', part && A.state.sel.length === 0);
+  }
+  /* дотик до кнопки поверху в прозорому режимі: схований → відкритий → прозорий → схований */
+  function railTap(f) {
+    var st = A.state, sel = st.sel.slice(), i = sel.indexOf(f);
+    if (i >= 0) {                                   /* відкритий → прозорий */
+      sel.splice(i, 1); GS[f] = 1; own = true;
+      (AUTO[f] || []).forEach(function (g) { if (GS[g] === 2) delete GS[g]; }); delete AUTO[f];
+      return Promise.resolve(A.fn.setFloors(sel, true)).then(function () { own = false; A.fn.vis(); }, function () { own = false; });
+    }
+    if (GS[f]) { delete GS[f]; A.fn.vis(); return Promise.resolve(); }      /* прозорий → схований */
+    if (sel.length >= 5) { toast('Уже відкрито 5 поверхів — спершу приберіть один.'); return Promise.resolve(); }
+    sel.push(f);                                    /* схований → відкритий; поверх над ним стане прозорим (див. trackSel) */
+    return Promise.resolve(A.fn.setFloors(sel, sel.length > 1 || gsCount() > 0));
+  }
+
   function loadNets() {
     nets = 1;
     return A.fn.text('ck-nets').then(A.fn.dec).then(function (e) {
@@ -6091,8 +6146,11 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     v = !!v; if (!A || v === on) return;
     on = v; window.__A3x = on;
     document.body.classList.toggle('xr', on);
+    GS = {}; AUTO = {};
+    if (on && !C) A.state.sel.forEach(function (f) { aboveOf(f).forEach(function (g) { if (A.state.sel.indexOf(g) < 0 && !GS[g]) { GS[g] = 2; (AUTO[f] = AUTO[f] || []).push(g); } }); });
     syncUI(); A.fn.vis();
     if (on && !nets) loadNets();
+    if (on && !C && !picking) toast('Кнопки поверхів: відкритий → прозорий → схований');
   }
 
   /* ───────────── що над цією точкою ───────────── */
@@ -6313,14 +6371,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     if (!lock) { var done = {}; c.rows.forEach(function (r) { if (r.key && !done[r.key]) { done[r.key] = 1; fillOwner(r); } }); }
   }
   function show(c) {
+    if (prevOn === null) { prevOn = on; savedGS = GS; }
     C = c;
-    if (prevOn === null) prevOn = on;
-    setOn(true); drawMarks(c); render(c); fly(c); A.render();
+    setOn(true);
+    GS = {}; c.rows.forEach(function (r) { if (A.state.sel.indexOf(r.f.id) < 0) GS[r.f.id] = 1; });
+    A.fn.vis(); drawMarks(c); render(c); fly(c); A.render();
   }
   function closeCol() {
-    var was = prevOn; C = null; prevOn = null; mini = false; clearMarks();
+    var was = prevOn, gsWas = savedGS; C = null; prevOn = null; savedGS = null; mini = false; clearMarks();
     $('xrpanel').hidden = true; document.body.classList.remove('xr-col');
     if (was === false) setOn(false);
+    else if (on) { GS = {}; if (gsWas) for (var k in gsWas) if (A.state.sel.indexOf(+k) < 0) GS[k] = 1; A.fn.vis(); }
     syncUI(); if (A) A.render();
   }
   function startPick() {
@@ -6365,7 +6426,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     var lay = $('layers'), h2 = lay && lay.previousElementSibling;
     if (h2 && !$('xrblock')) h2.insertAdjacentHTML('beforebegin', '<div id="xrblock"><h2>Прозорість і протікання</h2>' +
       '<label class="layer"><input id="xron" type="checkbox"><span>Прозорий будинок</span></label>' +
-      '<p class="muted" style="margin:0 0 8px">Будинок стає напівпрозорим, мережі лишаються непрозорими. Відкриті поверхи показано як звичайно.</p>' +
+      '<p class="muted" style="margin:0 0 8px">Мережі лишаються непрозорими. Кнопки поверхів праворуч у цьому режимі перемикають по колу: відкритий → прозорий (жовта обвідка) → схований. «Увесь будинок» робить прозорим усе.</p>' +
       '<div class="grid"><button id="xrpick" type="button" style="grid-column:span 2">Що над цією точкою…</button></div></div>');
     $('xron').addEventListener('change', function (e) { setOn(e.target.checked); });
     $('xrpick').addEventListener('click', function () { if (C) closeCol(); startPick(); });
@@ -6386,6 +6447,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       }
     });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { if (picking) stopPick(); else if (C) closeCol(); } });
+    /* кнопки поверхів у прозорому режимі мають три стани; поза ним працюють як завжди */
+    $('rail').addEventListener('click', function (e) {
+      if (!on || C) return;
+      var b = e.target && e.target.closest && e.target.closest('[data-floor]'); if (!b) return;
+      var f = b.getAttribute('data-floor');
+      if (f === 'all') { GS = {}; if (!A.state.sel.length) A.fn.vis(); return; }      /* далі спрацює звичайна кнопка «Увесь будинок» */
+      e.stopPropagation(); e.preventDefault(); railTap(+f);
+    }, true);
   }
   function start() {
     A = window.__A3; if (!A || !A.fn) return;
@@ -6393,7 +6462,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     window.__A3tap = onTap;
     ui(); syncUI();
     window.P00.xray = {
-      set: setOn, state: function () { return { on: on, nets: nets, picking: picking, column: C ? { x: C.x, y: C.y, floor: C.F, here: C.here && C.here.title, rows: C.rows.map(function (r) { return { floor: r.f.id, title: r.title, key: r.key, sub: r.sub }; }), pipes: C.pipes.map(function (p) { return { name: p.name, d: +p.d.toFixed(2) }; }) } : null }; },
+      set: setOn, tap: function (f) { return railTap(+f); }, state: function () { return { on: on, nets: nets, picking: picking, ghost: Object.keys(GS).map(Number).sort(function (p, q) { return p - q; }), column: C ? { x: C.x, y: C.y, floor: C.F, here: C.here && C.here.title, rows: C.rows.map(function (r) { return { floor: r.f.id, title: r.title, key: r.key, sub: r.sub }; }), pipes: C.pipes.map(function (p) { return { name: p.name, d: +p.d.toFixed(2) }; }) } : null }; },
       pick: startPick, close: closeCol,
       at: function (x, y, F) { return loadCol().then(function () { show(compute(x, y, F)); return window.P00.xray.state().column; }); }
     };
