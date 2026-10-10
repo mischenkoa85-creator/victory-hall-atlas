@@ -462,6 +462,23 @@ body.xr-part #rail button.all.on{background:#e8ebe8;border-color:#e8ebe8;box-sha
   #detprint .src{font-size:8.5pt;color:#333}
   #detprint .sign{display:flex;gap:14pt;margin-top:16pt;break-inside:avoid}
 }
+
+/* ── рівень деталізації всієї моделі ── */
+#lvlpill{position:fixed;left:12px;top:calc(var(--safe-t) + 140px);z-index:4;display:flex;align-items:center;gap:8px;min-height:38px;padding:0 13px 0 9px;
+  border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:19px;box-shadow:0 1px 6px rgba(0,0,0,.12);font-size:13px;font-weight:650;white-space:nowrap}
+#lvlpill[hidden]{display:none}
+#lvlpill i{position:relative;flex:0 0 auto;width:30px;height:18px;border-radius:9px;background:var(--ink2);opacity:.55;transition:background .15s,opacity .15s}
+#lvlpill i::after{content:"";position:absolute;left:2px;top:2px;width:14px;height:14px;border-radius:7px;background:#fff;transition:left .15s}
+#lvlpill.on i{background:var(--amber);opacity:1}
+#lvlpill.on i::after{left:14px}
+#lvlpill.mix i{background:var(--amber);opacity:.6}
+#lvlpill.mix i::after{left:8px}
+body.boot #lvlpill{display:none}
+#detblock .lvseg{display:flex;gap:6px;margin:2px 0 0}
+#detblock .lvseg button{flex:1 1 0;min-width:0;min-height:44px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:10px;font-size:14px;font-weight:650}
+#detblock .lvseg button.on{background:var(--amber);border-color:var(--amber);color:#1c2226}
+#detblock .lvseg button.on::before{content:"✓\00a0"}
+@media (prefers-reduced-motion:reduce){#lvlpill i,#lvlpill i::after{transition:none}}
 </style>
 <canvas id="c" aria-label="3D-модель будинку"></canvas>
 
@@ -534,7 +551,7 @@ body.xr-part #rail button.all.on{background:#e8ebe8;border-color:#e8ebe8;box-sha
 <a id="gofl" href="#" hidden><svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h14M3 10h14M3 15h14"/></svg>Зведення поверху</a>
 <button id="skypill" type="button" hidden></button>
 <section id="skypanel" hidden aria-label="Сонце, Місяць і погода"></section>
-<button id="xrchip" type="button" hidden></button><section id="xrpanel" class="xpanel" hidden aria-label="Над цією точкою"></section><section id="detpanel" class="xpanel" hidden aria-label="Двері спільних зон"></section><section id="dtpanel" class="xpanel" hidden aria-label="Типи дверей за проєктом"></section>
+<button id="xrchip" type="button" hidden></button><button id="lvlpill" type="button" hidden></button><section id="xrpanel" class="xpanel" hidden aria-label="Над цією точкою"></section><section id="detpanel" class="xpanel" hidden aria-label="Двері спільних зон"></section><section id="dtpanel" class="xpanel" hidden aria-label="Типи дверей за проєктом"></section>
 <script>
 try { localStorage.removeItem('atlas-theme'); } catch (e) {}
 window.__hostTheme = document.documentElement.getAttribute('data-theme');
@@ -6197,6 +6214,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     }
     syncRail();
     var dc = $('deton'); if (dc) dc.checked = A.state.layer.ddet === true;      /* шар деталей могли ввімкнути й вибором обʼєкта */
+    syncLvl();
   }
   /* кнопки поверхів: обвідка — прозорий поверх */
   function syncRail() {
@@ -6500,6 +6518,52 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     stopPick();
     loadCol().then(function () { show(compute(x, y, F)); }, function () { toast('Контури приміщень не завантажилися — перевірте звʼязок'); });
     return true;
+  }
+
+  /* ───────────── рівень деталізації всієї моделі: «спрощено» / «детально» ─────────────
+     Дрібні деталі зібрано в пʼять шарів. Спрощений вигляд їх ховає, детальний показує всі разом.
+     Будинок, приміщення, труби, лотки, щити й обладнання лишаються в обох виглядах. */
+  var LV = ['ddet', 'fit', 'eldev', 'lights', 'lights_em'], LV_LS = 'atlas-level-v1';
+  function lvState() {
+    if (!A) return 'simple';
+    var n = 0; LV.forEach(function (g) { if (A.state.layer[g] === true) n++; });
+    return n === 0 ? 'simple' : n === LV.length ? 'detail' : 'mixed';
+  }
+  function setLevel(l, quiet) {
+    if (!A) return;
+    var v = l === 'detail';
+    LV.forEach(function (g) { A.state.layer[g] = v; });
+    [].forEach.call(document.querySelectorAll('#layers input'), function (i) { if (LV.indexOf(i.getAttribute('data-g')) >= 0) i.checked = v; });
+    try { localStorage.setItem(LV_LS, v ? 'detail' : 'simple'); } catch (e) { /* без памʼяті браузера вибір просто не збережеться */ }
+    A.fn.vis(); syncUI();
+    if (!quiet) toast(v ? 'Детальний вигляд: світильники, розетки, арматура труб, доводчики й ручки дверей' : 'Спрощений вигляд: дрібні деталі сховано');
+  }
+  function syncLvl() {
+    var st = lvState(), p = $('lvlpill'), a = $('lvs'), b = $('lvd');
+    if (a) { a.className = st === 'simple' ? 'on' : ''; a.setAttribute('aria-pressed', st === 'simple'); }
+    if (b) { b.className = st === 'detail' ? 'on' : ''; b.setAttribute('aria-pressed', st === 'detail'); }
+    var m = $('lvmix'); if (m) m.hidden = st !== 'mixed';
+    if (!p) return;
+    p.hidden = !A; p.className = st === 'detail' ? 'on' : st === 'mixed' ? 'mix' : '';
+    p.setAttribute('aria-label', 'Вигляд моделі: ' + (st === 'detail' ? 'детально' : st === 'mixed' ? 'частково детально' : 'спрощено') + '. Торкніться, щоб перемкнути');
+    var t = st === 'detail' ? 'Детально' : st === 'mixed' ? 'Частково детально' : 'Спрощено';
+    if (p.getAttribute('data-t') !== t) { p.setAttribute('data-t', t); p.innerHTML = '<i></i><span>' + t + '</span>'; }
+    placeLvl();
+  }
+  /* Де стоїть кнопка рівня. На телефоні — під карткою дати й погоди (картка буває трьох розмірів, тож місце рахуємо).
+     На широкому екрані ліву колонку займає картка обʼєкта, тому кнопка стає у верхній ряд, праворуч від «Зведення поверху». */
+  function placeLvl() {
+    var p = $('lvlpill'); if (!p || p.hidden) return;
+    var s = $('skypill'), g = $('gofl'), rs = s && !s.hidden ? s.getBoundingClientRect() : null, rg = g && !g.hidden ? g.getBoundingClientRect() : null;
+    if (rs && !rs.height) rs = null; if (rg && !rg.height) rg = null;
+    if (window.innerWidth >= 900) {
+      var an = rg || rs;
+      p.style.left = Math.round(an ? an.right + 10 : 12) + 'px';
+      p.style.top = Math.round(an ? (rg ? an.top + (an.height - 38) / 2 : an.top) : 60) + 'px';
+    } else {
+      p.style.left = '';
+      p.style.top = Math.round(Math.max(52, rg ? rg.bottom : 0, rs ? rs.bottom : 0) + 8) + 'px';
+    }
   }
 
   /* ───────────── деталізація: доводчики й ручки дверей спільних зон ───────────── */
@@ -6828,6 +6892,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   function syncUI() {
     var c = $('xron'); if (c) c.checked = on;
     var dc = $('deton'); if (dc && A) dc.checked = A.state.layer.ddet === true;
+    syncLvl();
     var chip = $('xrchip'); if (!chip) return;
     if (picking) { chip.hidden = false; chip.className = 'pick'; chip.innerHTML = '<span>Торкніться місця, де тече</span><b>Скасувати</b>'; }
     else if (C && mini) { chip.hidden = false; chip.className = ''; chip.innerHTML = '<span>Над точкою: список</span><b>Показати</b>'; }
@@ -6843,10 +6908,24 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       '<p class="muted" style="margin:0 0 8px">Мережі лишаються непрозорими. Кнопки поверхів праворуч у цьому режимі перемикають по колу: відкритий → прозорий (жовта обвідка) → схований. «Увесь будинок» робить прозорим усе.</p>' +
       '<div class="grid"><button id="xrpick" type="button" style="grid-column:span 2">Що над цією точкою…</button></div></div>' +
       '<div id="detblock"><h2>Деталізація</h2>' +
+      '<div class="lvseg" role="group" aria-label="Вигляд моделі"><button id="lvs" type="button">Спрощено</button><button id="lvd" type="button">Детально</button></div>' +
+      '<p class="muted" style="margin:6px 0 4px">Спрощено — будинок, приміщення, труби, лотки, щити. Детально — ще й світильники, вимикачі й розетки, арматура і кріплення труб, доводчики й ручки дверей.</p>' +
+      '<p id="lvmix" class="muted" style="margin:0 0 4px" hidden>Зараз увімкнено лише частину дрібних деталей — окремі шари перемикаються нижче, у «Шарах».</p>' +
       '<label class="layer"><input id="deton" type="checkbox"><span>Двері: доводчики і ручки</span></label>' +
-      '<p class="muted" style="margin:0 0 8px">Дрібні деталі дверей спільних зон. Зазвичай сховані, щоб не захаращувати модель.</p>' +
+      '<p class="muted" style="margin:0 0 8px">Тільки деталі дверей спільних зон, без решти дрібниць.</p>' +
       '<div class="grid"><button id="detlist" type="button" style="grid-column:span 2">Двері спільних зон…</button><button id="dtlist" type="button" style="grid-column:span 2">Типи дверей за проєктом…</button></div></div>');
     $('deton').addEventListener('change', function (e) { setDetail(e.target.checked); });
+    $('lvs').addEventListener('click', function () { setLevel('simple'); });
+    $('lvd').addEventListener('click', function () { setLevel('detail'); });
+    var lp = $('lvlpill');
+    if (lp) {
+      lp.addEventListener('click', function () { setLevel(lvState() === 'detail' ? 'simple' : 'detail'); });
+      window.addEventListener('resize', placeLvl);
+      /* картка дати й погоди та кнопка «Зведення поверху» зʼявляються і змінюють розмір самі — стежимо за ними */
+      if (window.MutationObserver) ['skypill', 'gofl'].forEach(function (id) { var el = $(id); if (el) new MutationObserver(function () { setTimeout(placeLvl, 0); }).observe(el, { attributes: true, childList: true, subtree: true, characterData: true }); });
+    }
+    /* шари могли перемкнути галочками у «Шарах» */
+    var ly = $('layers'); if (ly) ly.addEventListener('change', function () { setTimeout(syncLvl, 0); });
     $('detlist').addEventListener('click', showDoors);
     $('dtlist').addEventListener('click', function () { dtMini = false; showTypes(); });
     $('dtpanel').addEventListener('click', function (e) {
@@ -6918,8 +6997,14 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     A = window.__A3; if (!A || !A.fn) return;
     window.__A3g = function (kind) { if (kind === 'vis') applyVis(); };
     window.__A3tap = onTap;
-    ui(); syncUI();
+    ui();
+    var lv0 = null; try { lv0 = localStorage.getItem(LV_LS); } catch (e) { lv0 = null; }
+    setLevel(lv0 === 'detail' ? 'detail' : 'simple', true);
+    /* якщо сторінку відкрили одразу на обʼєкті з дрібних деталей — його шар лишається видимим */
+    var pk0 = A.state.picked; if (pk0 >= 0) { var g0 = A.head.cat2g[A.head.cats[A.head.obj.cat[pk0]]]; if (LV.indexOf(g0) >= 0 && A.state.layer[g0] !== true) { A.state.layer[g0] = true; A.fn.vis(); } }
+    syncUI();
     window.P00.xray = {
+      level: { set: function (l) { setLevel(l === 'detail' ? 'detail' : 'simple', true); return lvState(); }, get: lvState, groups: LV.slice() },
       set: setOn, tap: function (f) { return railTap(+f); }, state: function () { return { on: on, nets: nets, picking: picking, ghost: Object.keys(GS).map(Number).sort(function (p, q) { return p - q; }), column: C ? { x: C.x, y: C.y, floor: C.F, here: C.here && C.here.title, rows: C.rows.map(function (r) { return { floor: r.f.id, title: r.title, key: r.key, sub: r.sub }; }), pipes: C.pipes.map(function (p) { return { name: p.name, d: +p.d.toFixed(2) }; }) } : null }; },
       pick: startPick, close: closeCol, detail: setDetail, doors: showDoors, closeDoors: closeDoors, flyDetail: flyDetail, types: function () { dtMini = false; return showTypes(); }, closeTypes: closeTypes, typeData: function () { return loadTypes().then(function (j) { return j.types.map(function (t) { return { mark: t.mark, svg: doorSvg(t), qty: t.qty.length ? qtyText(t.qty) : '' }; }); }); }, check: { set: function (id, st) { ckSet(id, st); if (DOORS && !$('detpanel').hidden) renderDoors(); }, note: ckNote, get: function () { return JSON.parse(JSON.stringify(ckLoad())); }, text: function () { return loadDoors().then(sheetText); }, fill: function () { return loadDoors().then(fillPrint); }, print: printSheet },
       at: function (x, y, F) { return loadCol().then(function () { show(compute(x, y, F)); return window.P00.xray.state().column; }); }
