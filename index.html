@@ -479,6 +479,8 @@ body.boot #lvlpill{display:none}
 #detblock .lvseg button.on{background:var(--amber);border-color:var(--amber);color:#1c2226}
 #detblock .lvseg button.on::before{content:"✓\00a0"}
 @media (prefers-reduced-motion:reduce){#lvlpill i,#lvlpill i::after{transition:none}}
+#detblock .lvx{min-height:40px}
+#detblock .lvx small{color:var(--ink2);font-size:12.5px;margin-left:2px}
 </style>
 <canvas id="c" aria-label="3D-модель будинку"></canvas>
 
@@ -6213,8 +6215,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       }
     }
     syncRail();
-    var dc = $('deton'); if (dc) dc.checked = A.state.layer.ddet === true;      /* шар деталей могли ввімкнути й вибором обʼєкта */
-    syncLvl();
+    syncLvl();      /* шар могли ввімкнути й вибором обʼєкта */
   }
   /* кнопки поверхів: обвідка — прозорий поверх */
   function syncRail() {
@@ -6520,33 +6521,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     return true;
   }
 
-  /* ───────────── рівень деталізації всієї моделі: «спрощено» / «детально» ─────────────
-     Дрібні деталі зібрано в пʼять шарів. Спрощений вигляд їх ховає, детальний показує всі разом.
-     Будинок, приміщення, труби, лотки, щити й обладнання лишаються в обох виглядах. */
-  var LV = ['ddet', 'fit', 'eldev', 'lights', 'lights_em'], LV_LS = 'atlas-level-v1';
-  function lvState() {
-    if (!A) return 'simple';
-    var n = 0; LV.forEach(function (g) { if (A.state.layer[g] === true) n++; });
-    return n === 0 ? 'simple' : n === LV.length ? 'detail' : 'mixed';
+  /* ───────────── повна модель і спрощення ─────────────
+     Сторінка відкривається з повною моделлю. Спрощення вмикають: одразу все або окремо за елементами.
+     Спростити елемент — сховати його дрібні деталі (один шар). Самі двері, труби, лотки й щити лишаються завжди. */
+  var LV = [['ddet', 'Двері', 'без доводчиків і ручок'], ['fit', 'Водопровід', 'без арматури, трійників і кріплень'], ['eldev', 'Електрика вежі', 'без світильників, вимикачів і розеток'],
+            ['lights', 'Освітлення робоче', 'без світильників'], ['lights_em', 'Освітлення аварійне', 'без світильників і покажчиків «Вихід»']],
+      LVG = LV.map(function (x) { return x[0]; }), LV_LS = 'atlas-simplify-v1';
+  function lvHidden() { return A ? LVG.filter(function (g) { return A.state.layer[g] !== true; }) : []; }
+  function lvState() { var n = lvHidden().length; return n === 0 ? 'full' : n === LVG.length ? 'simple' : 'mixed'; }
+  /* запамʼятовуємо лише те, що людина обрала сама; шар, який увімкнувся через вибір обʼєкта, у памʼять не йде */
+  function lvSave() { try { localStorage.setItem(LV_LS, JSON.stringify(lvHidden())); } catch (e) { /* без памʼяті браузера вибір просто не збережеться */ } }
+  function lvApply(hidden) {
+    if (!A) return;
+    LVG.forEach(function (g) { A.state.layer[g] = hidden.indexOf(g) < 0; });
+    [].forEach.call(document.querySelectorAll('#layers input'), function (i) { var g = i.getAttribute('data-g'); if (LVG.indexOf(g) >= 0) i.checked = A.state.layer[g] === true; });
+    A.fn.vis(); syncUI();
   }
   function setLevel(l, quiet) {
     if (!A) return;
-    var v = l === 'detail';
-    LV.forEach(function (g) { A.state.layer[g] = v; });
-    [].forEach.call(document.querySelectorAll('#layers input'), function (i) { if (LV.indexOf(i.getAttribute('data-g')) >= 0) i.checked = v; });
-    try { localStorage.setItem(LV_LS, v ? 'detail' : 'simple'); } catch (e) { /* без памʼяті браузера вибір просто не збережеться */ }
-    A.fn.vis(); syncUI();
-    if (!quiet) toast(v ? 'Детальний вигляд: світильники, розетки, арматура труб, доводчики й ручки дверей' : 'Спрощений вигляд: дрібні деталі сховано');
+    var simple = l === 'simple';
+    lvApply(simple ? LVG.slice() : []); lvSave();
+    if (!quiet) toast(simple ? 'Спрощення ввімкнено: дрібні деталі сховано' : 'Повна модель: усі деталі показано');
+  }
+  function setSimple(g, v) {
+    if (!A || LVG.indexOf(g) < 0) return;
+    var h = lvHidden().filter(function (x) { return x !== g; }); if (v) h.push(g);
+    lvApply(h); lvSave();
   }
   function syncLvl() {
-    var st = lvState(), p = $('lvlpill'), a = $('lvs'), b = $('lvd');
-    if (a) { a.className = st === 'simple' ? 'on' : ''; a.setAttribute('aria-pressed', st === 'simple'); }
-    if (b) { b.className = st === 'detail' ? 'on' : ''; b.setAttribute('aria-pressed', st === 'detail'); }
-    var m = $('lvmix'); if (m) m.hidden = st !== 'mixed';
+    var st = lvState(), p = $('lvlpill'), a = $('lvf'), b = $('lvs'), hid = lvHidden();
+    if (a) { a.className = st === 'full' ? 'on' : ''; a.setAttribute('aria-pressed', st === 'full'); }
+    if (b) { b.className = st === 'simple' ? 'on' : ''; b.setAttribute('aria-pressed', st === 'simple'); }
+    LVG.forEach(function (g) { var c = $('lvx-' + g); if (c) c.checked = hid.indexOf(g) >= 0; });
     if (!p) return;
-    p.hidden = !A; p.className = st === 'detail' ? 'on' : st === 'mixed' ? 'mix' : '';
-    p.setAttribute('aria-label', 'Вигляд моделі: ' + (st === 'detail' ? 'детально' : st === 'mixed' ? 'частково детально' : 'спрощено') + '. Торкніться, щоб перемкнути');
-    var t = st === 'detail' ? 'Детально' : st === 'mixed' ? 'Частково детально' : 'Спрощено';
+    p.hidden = !A; p.className = st === 'simple' ? 'on' : st === 'mixed' ? 'mix' : '';
+    p.setAttribute('aria-label', 'Спрощення моделі: ' + (st === 'simple' ? 'увімкнено' : st === 'mixed' ? 'увімкнено частково' : 'вимкнено, модель повна') + '. Торкніться, щоб перемкнути');
+    var t = st === 'simple' ? 'Спрощено' : st === 'mixed' ? 'Спрощено частково' : 'Повна модель';
     if (p.getAttribute('data-t') !== t) { p.setAttribute('data-t', t); p.innerHTML = '<i></i><span>' + t + '</span>'; }
     placeLvl();
   }
@@ -6891,7 +6901,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   /* ───────────── кнопки ───────────── */
   function syncUI() {
     var c = $('xron'); if (c) c.checked = on;
-    var dc = $('deton'); if (dc && A) dc.checked = A.state.layer.ddet === true;
     syncLvl();
     var chip = $('xrchip'); if (!chip) return;
     if (picking) { chip.hidden = false; chip.className = 'pick'; chip.innerHTML = '<span>Торкніться місця, де тече</span><b>Скасувати</b>'; }
@@ -6908,24 +6917,23 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       '<p class="muted" style="margin:0 0 8px">Мережі лишаються непрозорими. Кнопки поверхів праворуч у цьому режимі перемикають по колу: відкритий → прозорий (жовта обвідка) → схований. «Увесь будинок» робить прозорим усе.</p>' +
       '<div class="grid"><button id="xrpick" type="button" style="grid-column:span 2">Що над цією точкою…</button></div></div>' +
       '<div id="detblock"><h2>Деталізація</h2>' +
-      '<div class="lvseg" role="group" aria-label="Вигляд моделі"><button id="lvs" type="button">Спрощено</button><button id="lvd" type="button">Детально</button></div>' +
-      '<p class="muted" style="margin:6px 0 4px">Спрощено — будинок, приміщення, труби, лотки, щити. Детально — ще й світильники, вимикачі й розетки, арматура і кріплення труб, доводчики й ручки дверей.</p>' +
-      '<p id="lvmix" class="muted" style="margin:0 0 4px" hidden>Зараз увімкнено лише частину дрібних деталей — окремі шари перемикаються нижче, у «Шарах».</p>' +
-      '<label class="layer"><input id="deton" type="checkbox"><span>Двері: доводчики і ручки</span></label>' +
-      '<p class="muted" style="margin:0 0 8px">Тільки деталі дверей спільних зон, без решти дрібниць.</p>' +
+      '<div class="lvseg" role="group" aria-label="Повна модель або спрощена"><button id="lvf" type="button">Повна модель</button><button id="lvs" type="button">Спрощено</button></div>' +
+      '<p class="muted" style="margin:6px 0 6px">Модель відкривається повною. Спрощення ховає дрібні деталі — одразу всі або окремо за елементами:</p>' +
+      LV.map(function (x) { return '<label class="layer lvx"><input id="lvx-' + x[0] + '" type="checkbox" data-lvx="' + x[0] + '"><span>' + x[1] + ' <small>' + x[2] + '</small></span></label>'; }).join('') +
+      '<p class="muted" style="margin:4px 0 8px">Самі двері, труби, лотки, щити й обладнання лишаються завжди. Якщо обрати сховану деталь у списку чи пошуку, вона зʼявиться сама.</p>' +
       '<div class="grid"><button id="detlist" type="button" style="grid-column:span 2">Двері спільних зон…</button><button id="dtlist" type="button" style="grid-column:span 2">Типи дверей за проєктом…</button></div></div>');
-    $('deton').addEventListener('change', function (e) { setDetail(e.target.checked); });
+    $('lvf').addEventListener('click', function () { setLevel('full'); });
     $('lvs').addEventListener('click', function () { setLevel('simple'); });
-    $('lvd').addEventListener('click', function () { setLevel('detail'); });
+    $('detblock').addEventListener('change', function (e) { var g = e.target && e.target.getAttribute && e.target.getAttribute('data-lvx'); if (g) setSimple(g, e.target.checked); });
     var lp = $('lvlpill');
     if (lp) {
-      lp.addEventListener('click', function () { setLevel(lvState() === 'detail' ? 'simple' : 'detail'); });
+      lp.addEventListener('click', function () { setLevel(lvState() === 'full' ? 'simple' : 'full'); });      /* з часткового спрощення дотик повертає повну модель */
       window.addEventListener('resize', placeLvl);
       /* картка дати й погоди та кнопка «Зведення поверху» зʼявляються і змінюють розмір самі — стежимо за ними */
       if (window.MutationObserver) ['skypill', 'gofl'].forEach(function (id) { var el = $(id); if (el) new MutationObserver(function () { setTimeout(placeLvl, 0); }).observe(el, { attributes: true, childList: true, subtree: true, characterData: true }); });
     }
     /* шари могли перемкнути галочками у «Шарах» */
-    var ly = $('layers'); if (ly) ly.addEventListener('change', function () { setTimeout(syncLvl, 0); });
+    var ly = $('layers'); if (ly) ly.addEventListener('change', function (e) { var g = e.target && e.target.getAttribute && e.target.getAttribute('data-g'); setTimeout(function () { syncLvl(); if (LVG.indexOf(g) >= 0) lvSave(); }, 0); });
     $('detlist').addEventListener('click', showDoors);
     $('dtlist').addEventListener('click', function () { dtMini = false; showTypes(); });
     $('dtpanel').addEventListener('click', function (e) {
@@ -6998,13 +7006,16 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     window.__A3g = function (kind) { if (kind === 'vis') applyVis(); };
     window.__A3tap = onTap;
     ui();
-    var lv0 = null; try { lv0 = localStorage.getItem(LV_LS); } catch (e) { lv0 = null; }
-    setLevel(lv0 === 'detail' ? 'detail' : 'simple', true);
+    /* старт: повна модель; якщо на цьому пристрої вже обирали спрощення — воно повертається */
+    var lv0 = []; try { lv0 = JSON.parse(localStorage.getItem(LV_LS) || '[]'); } catch (e) { lv0 = []; }
+    if (!Array.isArray(lv0)) lv0 = [];
+    lv0 = lv0.filter(function (g) { return LVG.indexOf(g) >= 0; });
     /* якщо сторінку відкрили одразу на обʼєкті з дрібних деталей — його шар лишається видимим */
-    var pk0 = A.state.picked; if (pk0 >= 0) { var g0 = A.head.cat2g[A.head.cats[A.head.obj.cat[pk0]]]; if (LV.indexOf(g0) >= 0 && A.state.layer[g0] !== true) { A.state.layer[g0] = true; A.fn.vis(); } }
+    var pk0 = A.state.picked; if (pk0 >= 0) { var g0 = A.head.cat2g[A.head.cats[A.head.obj.cat[pk0]]]; lv0 = lv0.filter(function (g) { return g !== g0; }); }
+    lvApply(lv0);
     syncUI();
     window.P00.xray = {
-      level: { set: function (l) { setLevel(l === 'detail' ? 'detail' : 'simple', true); return lvState(); }, get: lvState, groups: LV.slice() },
+      level: { set: function (l) { setLevel(l === 'simple' ? 'simple' : 'full', true); return lvState(); }, get: lvState, groups: LVG.slice(), hidden: lvHidden, simplify: function (g, v) { setSimple(g, v !== false); return lvHidden(); } },
       set: setOn, tap: function (f) { return railTap(+f); }, state: function () { return { on: on, nets: nets, picking: picking, ghost: Object.keys(GS).map(Number).sort(function (p, q) { return p - q; }), column: C ? { x: C.x, y: C.y, floor: C.F, here: C.here && C.here.title, rows: C.rows.map(function (r) { return { floor: r.f.id, title: r.title, key: r.key, sub: r.sub }; }), pipes: C.pipes.map(function (p) { return { name: p.name, d: +p.d.toFixed(2) }; }) } : null }; },
       pick: startPick, close: closeCol, detail: setDetail, doors: showDoors, closeDoors: closeDoors, flyDetail: flyDetail, types: function () { dtMini = false; return showTypes(); }, closeTypes: closeTypes, typeData: function () { return loadTypes().then(function (j) { return j.types.map(function (t) { return { mark: t.mark, svg: doorSvg(t), qty: t.qty.length ? qtyText(t.qty) : '' }; }); }); }, check: { set: function (id, st) { ckSet(id, st); if (DOORS && !$('detpanel').hidden) renderDoors(); }, note: ckNote, get: function () { return JSON.parse(JSON.stringify(ckLoad())); }, text: function () { return loadDoors().then(sheetText); }, fill: function () { return loadDoors().then(fillPrint); }, print: printSheet },
       at: function (x, y, F) { return loadCol().then(function () { show(compute(x, y, F)); return window.P00.xray.state().column; }); }
