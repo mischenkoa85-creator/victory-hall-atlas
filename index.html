@@ -379,14 +379,54 @@ body.xr-col #sheet{visibility:hidden}
 body.xr-part #rail button.all.on{background:#e8ebe8;border-color:#e8ebe8;box-shadow:none}
 /* деталізація: шар деталей вмикається окремим перемикачем, тож у загальному списку шарів його не дублюємо */
 #layers label:has(input[data-g="ddet"]){display:none}
-#detpanel table{width:100%;border-collapse:collapse;font-size:13.5px;margin:6px 0 2px}
-#detpanel th{font-weight:600;color:var(--ink2);font-size:12.5px;text-align:left;padding:4px 6px 4px 0;border-bottom:1px solid var(--line)}
-#detpanel td{padding:7px 6px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
-#detpanel td small{display:block;color:var(--ink2);font-size:12.5px}
-#detpanel td:last-child,#detpanel th:last-child{text-align:right;padding-right:0;white-space:nowrap}
-#detpanel td button{border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600;min-height:36px}
-#detpanel .flsel{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:13.5px}
-#detpanel .flsel select{flex:1 1 auto;min-height:40px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);padding:0 8px;font-size:15px}
+#detpanel{max-height:64vh}
+@media (min-width:900px){#detpanel{max-height:min(78vh,720px)}}
+#detpanel .flsel{display:flex;align-items:center;gap:8px;margin:10px 0 4px;font-size:13.5px}
+#detpanel .flsel select{flex:1 1 auto;min-width:0;min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);padding:0 8px;font-size:15px}
+#detpanel .flsel button{flex:0 0 42px;height:42px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);font-size:20px;line-height:1}
+#detpanel .flsel button:disabled{opacity:.35}
+#detpanel ul.drs li{display:block;padding:10px 0;border-top:1px solid var(--line);font-size:14px}
+#detpanel ul.drs li:first-child{border-top:0}
+#detpanel .dr1{display:flex;align-items:flex-start;gap:10px}
+#detpanel .dn{flex:1 1 auto;min-width:0}
+#detpanel .dn b{display:block;font-size:14.5px;font-weight:650}
+#detpanel .dn small{display:block;color:var(--ink2);font-size:12.5px}
+#detpanel .dr1 button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:10px;padding:7px 10px;font-size:13px;font-weight:600;min-height:38px}
+#detpanel .seg{display:flex;gap:6px;margin-top:8px}
+#detpanel .seg button{flex:1 1 0;min-width:0;min-height:42px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);border-radius:10px;font-size:14px;font-weight:600;padding:0 6px}
+#detpanel .seg button.on{box-shadow:inset 0 0 0 1.5px currentColor}
+#detpanel .seg button.on.ok{background:var(--okbg);color:var(--okfg);border-color:var(--okfg)}
+#detpanel .seg button.on.none{background:var(--nobg);color:var(--nofg);border-color:var(--nofg)}
+#detpanel .seg button.on.bad{background:var(--ptbg);color:var(--ptfg);border-color:var(--ptfg)}
+#detpanel .seg button.on::before{content:"✓ "}
+#detpanel input.nt{display:block;width:100%;box-sizing:border-box;margin-top:8px;min-height:42px;border:1px solid var(--line);border-radius:10px;background:var(--panel2);color:var(--ink);padding:0 10px;font-size:16px}
+#detpanel .sum{font-size:13.5px;margin:10px 0 0;color:var(--ink)}
+#detpanel .xact.two{justify-content:stretch}
+#detpanel .xact.two button{flex:1 1 0}
+#detpanel .xact .ask{flex:1 1 auto;align-self:center;font-size:13.5px}
+/* відомість огляду: на екрані схована, друкується сама, без решти сторінки */
+#detprint{display:none}
+@media print{
+  @page{size:A4;margin:14mm 12mm}
+  html,body{height:auto!important;overflow:visible!important;background:#fff!important;color:#000!important;padding:0!important}
+  body>*:not(#detprint){display:none!important}
+  #detprint{display:block;font:10.5pt/1.35 -apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;color:#000}
+  #detprint h1{font-size:15pt;margin:0 0 2pt}
+  #detprint p{margin:0 0 6pt}
+  #detprint .sub{color:#333}
+  #detprint table{width:100%;table-layout:fixed;border-collapse:collapse;margin:6pt 0 8pt;font-size:9pt}
+  #detprint td{overflow-wrap:anywhere}
+  #detprint thead{display:table-header-group}
+  #detprint th,#detprint td{border:.6pt solid #555;padding:2.5pt 4pt;text-align:left;vertical-align:top}
+  #detprint td:nth-child(4),#detprint td:nth-child(5),#detprint td:nth-child(7){white-space:nowrap}
+  #detprint tr.nf td{border-top:1.4pt solid #000}
+  #detprint th{background:#eee;font-weight:700;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  #detprint tr{break-inside:avoid;page-break-inside:avoid}
+  #detprint tr.pr td:nth-child(6),#detprint tr.pr td:nth-child(8){font-weight:700}
+  #detprint td:nth-child(1),#detprint td:nth-child(2){text-align:right;white-space:nowrap}
+  #detprint .src{font-size:8.5pt;color:#333}
+  #detprint .sign{display:flex;gap:14pt;margin-top:16pt;break-inside:avoid}
+}
 </style>
 <canvas id="c" aria-label="3D-модель будинку"></canvas>
 
@@ -6442,24 +6482,117 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   var DSHORT = { 'ДЛ · двері коридор → ліфтовий хол': 'Коридор → ліфтовий хол', 'ДВ · двері водяної (тех. приміщення №4)': 'Технічне приміщення №4 (водяна)',
     'Двері: Коридор ↔ Тамбур-шлюз': 'Коридор ↔ тамбур-шлюз', 'Двері: Евакуаційний балкон (спільний) ↔ Тамбур-шлюз': 'Балкон ↔ тамбур-шлюз',
     'Двері: Евакуаційний балкон (спільний) ↔ Сходова клітина': 'Балкон ↔ сходова клітина' };
+  /* ── огляд доводчиків: позначки «є / немає / несправний». Сайт без сервера, тож позначки живуть на цьому пристрої;
+        передати їх далі — відомістю (друк або PDF) чи текстом ── */
+  var CK_LS = 'atlas-doorcheck-v1', CK = null, ckWarned = false, ckAsk = false;
+  var CKN = { ok: 'є, справний', none: 'немає', bad: 'несправний' }, CKB = { ok: 'Є', none: 'Немає', bad: 'Несправний' };
+  function ckLoad() {
+    if (CK) return CK; CK = {};
+    try { var j = JSON.parse(localStorage.getItem(CK_LS) || '{}'); if (j && typeof j === 'object' && !Array.isArray(j)) CK = j; } catch (e) {}
+    return CK;
+  }
+  function ckSave() {
+    try { localStorage.setItem(CK_LS, JSON.stringify(CK)); return true; } catch (e) {
+      if (!ckWarned) { ckWarned = true; toast('Браузер не дає зберігати дані на цьому пристрої: позначки зникнуть, коли закриєте сторінку'); }
+      return false;
+    }
+  }
+  function today() { var d = new Date(), p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()); }
+  function dmy(t) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t || ''); return m ? m[3] + '.' + m[2] + '.' + m[1] : ''; }
+  function ckSet(id, st) {
+    ckLoad();
+    if (!CKN[st] || (CK[id] && CK[id].s === st)) delete CK[id];           /* повторне натискання знімає позначку */
+    else CK[id] = { s: st, d: today(), n: (CK[id] && CK[id].n) || '' };
+    ckSave();
+  }
+  function ckNote(id, t) { ckLoad(); if (!CK[id]) return; CK[id].n = String(t || '').replace(/\s+/g, ' ').trim().slice(0, 160); ckSave(); }
+  function ckCount(list) {
+    var c = { ok: 0, none: 0, bad: 0, done: 0, all: list.length }; ckLoad();
+    list.forEach(function (r) { var k = CK[r.closer]; if (k && CKN[k.s]) { c[k.s]++; c.done++; } });
+    return c;
+  }
+  function dname(r) { return DSHORT[r.name] || r.name; }
+  function flnum(f) { return String(A.floors[f].name).replace('-й поверх', ''); }
   function renderDoors() {
-    var p = $('detpanel'), d = DOORS.doors, fls = {}, order = [], h;
+    var p = $('detpanel'), d = DOORS.doors, fls = {}, order = [], h, keep = p.hidden ? 0 : p.scrollTop;
     d.forEach(function (r) { if (!fls[r.fl]) { fls[r.fl] = []; order.push(r.fl); } fls[r.fl].push(r); });
     var sel = A.state.sel.filter(function (f) { return fls[f]; });
     if (detFloor === null || !fls[detFloor]) detFloor = sel.length ? sel[0] : order[0];
-    var num = function (f) { return String(A.floors[f].name).replace('-й поверх', ''); };
-    h = '<div class="hd"><div><b>Двері спільних зон</b><span>Поверхи ' + esc(num(order[0])) + '–' + esc(num(order[order.length - 1])) +
-      ' · ' + d.length + ' дверей · за проєктом усі з доводчиком</span></div><button type="button" class="x" data-det="close" aria-label="Закрити">✕</button></div>';
-    h += '<div class="flsel"><label for="detfl">Поверх</label><select id="detfl">' + order.map(function (f) { return '<option value="' + f + '"' + (f === detFloor ? ' selected' : '') + '>' + esc(A.floors[f].name) + '</option>'; }).join('') + '</select></div>';
-    h += '<table><tr><th>Двері</th><th>Марка</th><th>Доводчик</th></tr>';
+    var all = ckCount(d), here = ckCount(fls[detFloor]), at = order.indexOf(detFloor);
+    h = '<div class="hd"><div><b>Двері спільних зон</b><span>Поверхи ' + esc(flnum(order[0])) + '–' + esc(flnum(order[order.length - 1])) +
+      ' · ' + d.length + ' дверей · оглянуто ' + all.done + '</span></div><button type="button" class="x" data-det="close" aria-label="Закрити">✕</button></div>';
+    h += '<div class="flsel"><button type="button" data-det="prev" aria-label="Попередній поверх"' + (at > 0 ? '' : ' disabled') + '>‹</button><select id="detfl" aria-label="Поверх">' +
+      order.map(function (f) { var c = ckCount(fls[f]); return '<option value="' + f + '"' + (f === detFloor ? ' selected' : '') + '>' + esc(A.floors[f].name) + ' · ' + (c.done === c.all ? 'оглянуто' : c.done + ' з ' + c.all) + '</option>'; }).join('') +
+      '</select><button type="button" data-det="next" aria-label="Наступний поверх"' + (at < order.length - 1 ? '' : ' disabled') + '>›</button></div>';
+    h += '<ul class="drs">';
     fls[detFloor].forEach(function (r) {
-      h += '<tr><td>' + esc(DSHORT[r.name] || r.name) + '<small>' + esc(r.ei) + '</small></td><td>' + esc(r.mark) + '</td><td><button type="button" data-det="go" data-fl="' + r.fl + '" data-id="' + esc(r.closer) + '">Показати</button></td></tr>';
+      var k = CK[r.closer] || {}, id = esc(r.closer);
+      h += '<li><div class="dr1"><div class="dn"><b>' + esc(dname(r)) + '</b><small>' + esc(r.mark) + ' · ' + esc(r.ei) + (k.s ? ' · оглянуто ' + dmy(k.d) : '') + '</small></div>' +
+        '<button type="button" data-det="go" data-fl="' + r.fl + '" data-id="' + id + '">Показати</button></div>' +
+        '<div class="seg" role="group" aria-label="Стан доводчика">' + ['ok', 'none', 'bad'].map(function (st) {
+          return '<button type="button" data-det="ck" data-s="' + st + '" data-id="' + id + '" aria-pressed="' + (k.s === st) + '"' + (k.s === st ? ' class="on ' + st + '"' : '') + '>' + CKB[st] + '</button>'; }).join('') + '</div>' +
+        (k.s === 'none' || k.s === 'bad' ? '<input class="nt" type="text" data-id="' + id + '" maxlength="160" autocomplete="off" placeholder="Що не так — коротко" aria-label="Примітка до огляду" value="' + esc(k.n || '') + '">' : '') + '</li>';
     });
-    h += '</table>';
+    h += '</ul>';
+    h += '<p class="sum">На поверсі оглянуто ' + here.done + ' з ' + here.all + '. Усього: є — ' + all.ok + ', немає — ' + all.none + ', несправних — ' + all.bad + ', не оглянуто — ' + (all.all - all.done) + '.</p>';
+    h += '<div class="xact two"><button type="button" data-det="print">Відомість: друк або PDF</button><button type="button" data-det="copy">Скопіювати текстом</button></div>';
+    h += '<p class="note">Позначки огляду зберігаються лише на цьому пристрої, інші люди їх не бачать. Щоб передати результат — роздрукуйте відомість, збережіть її як PDF або скопіюйте текстом. Без позначок відомість друкується як порожній бланк для обходу.</p>';
     h += '<p class="note">' + esc(DOORS.note) + '</p>';
     h += '<p class="note">На 2–4-му поверхах у списку лише евакуаційні двері на балкон-перехід: решта дверей стилобата й цоколя в моделі зведена в загальні обʼєкти без марок, деталей на них ще немає. Вхідні двері квартир належать власникам і сюди не входять.</p>';
-    h += '<div class="xact"><button type="button" data-det="close">Закрити</button></div>';
-    p.innerHTML = h; p.hidden = false; detMini = false; syncUI();
+    h += ckAsk ? '<div class="xact"><span class="ask">Очистити всі позначки огляду?</span><button type="button" data-det="clear2">Так, очистити</button><button type="button" data-det="clear0">Ні</button></div>'
+      : '<div class="xact">' + (all.done ? '<button type="button" data-det="clear">Очистити позначки</button>' : '') + '<button type="button" data-det="close">Закрити</button></div>';
+    p.innerHTML = h; p.hidden = false; p.scrollTop = keep; detMini = false; syncUI();
+  }
+  /* відомість: рядки для друку і для тексту */
+  function sheetRows() {
+    ckLoad();
+    return DOORS.doors.map(function (r, i) { var k = CK[r.closer] || {}; return { n: i + 1, f: r.fl, fl: A.floors[r.fl].name, door: dname(r), mark: r.mark, ei: r.ei, s: CKN[k.s] ? k.s : '', st: CKN[k.s] || '', d: CKN[k.s] ? dmy(k.d) : '', note: CKN[k.s] ? (k.n || '') : '' }; });
+  }
+  function fillPrint() {
+    var el = $('detprint'); if (!el) { el = document.createElement('div'); el.id = 'detprint'; document.body.appendChild(el); }
+    var rows = sheetRows(), c = ckCount(DOORS.doors), fl = DOORS.doors.map(function (r) { return r.fl; }), h;
+    h = '<h1>Відомість огляду дверних доводчиків</h1>';
+    h += '<p class="sub">Victory Hall · двері спільних зон, поверхи ' + esc(flnum(fl[0])) + '–' + esc(flnum(fl[fl.length - 1])) + ' · сформовано ' + dmy(today()) + '</p>';
+    h += '<p>' + (c.done ? 'Оглянуто ' + c.done + ' з ' + c.all + ' дверей: є, справний — ' + c.ok + '; немає — ' + c.none + '; несправний — ' + c.bad + '; не оглянуто — ' + (c.all - c.done) + '.'
+      : 'Позначок огляду ще немає — це бланк для обходу. Стан доводчика вписують від руки: є, справний / немає / несправний.') + '</p>';
+    h += '<table><colgroup><col style="width:4.5%"><col style="width:5.5%"><col style="width:28%"><col style="width:7.5%"><col style="width:12%"><col style="width:13%"><col style="width:11.5%"><col></colgroup><thead><tr><th>№</th><th>Пов.</th><th>Двері</th><th>Марка</th><th>Клас</th><th>Стан доводчика</th><th>Дата огляду</th><th>Примітка</th></tr></thead><tbody>';
+    rows.forEach(function (r, i) {
+      var cl = (r.s === 'none' || r.s === 'bad' ? 'pr ' : '') + (i && rows[i - 1].f !== r.f ? 'nf' : '');
+      h += '<tr' + (cl ? ' class="' + cl.trim() + '"' : '') + '><td>' + r.n + '</td><td>' + esc(flnum(r.f)) + '</td><td>' + esc(r.door) + '</td><td>' + esc(r.mark) + '</td><td>' + esc(r.ei) + '</td><td>' + esc(r.st) + '</td><td>' + esc(r.d) + '</td><td>' + esc(r.note) + '</td></tr>';
+    });
+    h += '</tbody></table>';
+    h += '<p class="src">' + esc(DOORS.note) + ' Позначки огляду внесено в «Цифровому атласі» на пристрої того, хто оглядав.</p>';
+    h += '<p class="sign"><span>Оглянув: ____________________________</span><span>Підпис: ______________</span><span>Дата: ______________</span></p>';
+    el.innerHTML = h; return rows.length;
+  }
+  function printSheet() {
+    return loadDoors().then(function () {
+      fillPrint();
+      var t = document.title, back = function () { document.title = t; window.removeEventListener('afterprint', back); };
+      document.title = 'Відомість огляду дверних доводчиків — Victory Hall — ' + dmy(today());    /* з цієї назви браузер бере імʼя файлу PDF */
+      window.addEventListener('afterprint', back);
+      setTimeout(function () { try { window.print(); } catch (e) { back(); toast('Цей браузер не друкує сторінку — скористайтеся кнопкою «Скопіювати текстом»'); } }, 60);
+    }, function () { toast('Список дверей не завантажився — перевірте звʼязок'); });
+  }
+  function sheetText() {
+    var rows = sheetRows(), c = ckCount(DOORS.doors), out = [], bad = rows.filter(function (r) { return r.s === 'none' || r.s === 'bad'; }), todo = {}, tl = [];
+    out.push('Огляд дверних доводчиків спільних зон · Victory Hall · ' + dmy(today()));
+    out.push('Оглянуто ' + c.done + ' з ' + c.all + ' дверей: є, справний — ' + c.ok + '; немає — ' + c.none + '; несправний — ' + c.bad + '.');
+    if (bad.length) { out.push(''); out.push('Зауваження:'); bad.forEach(function (r) { out.push('• ' + r.fl + ', ' + r.door + ' (' + r.mark + ', ' + r.ei + ') — ' + r.st + (r.note ? ': ' + r.note : '') + ' · ' + r.d); }); }
+    else if (c.done) { out.push(''); out.push('Зауважень немає.'); }
+    rows.forEach(function (r) { if (!r.s) { if (!todo[r.f]) { todo[r.f] = 0; tl.push(r.f); } todo[r.f]++; } });
+    if (tl.length) {
+      /* сусідні поверхи згортаємо в проміжки: «2–12, 14–20» */
+      var nums = tl.map(function (f) { return +flnum(f); }), parts = [], a0 = nums[0], b0 = nums[0];
+      for (var q = 1; q <= nums.length; q++) { if (q < nums.length && nums[q] === b0 + 1) { b0 = nums[q]; continue; } parts.push(a0 === b0 ? '' + a0 : a0 + '–' + b0); a0 = b0 = nums[q]; }
+      out.push(''); out.push('Не оглянуто ' + (c.all - c.done) + ' дверей — поверхи: ' + parts.join(', ') + '.');
+    }
+    return out.join('\n');
+  }
+  function copySheet() {
+    var txt = sheetText(), fin = function (y) { toast(y ? 'Текст огляду скопійовано — вставте в повідомлення' : 'Не вдалося скопіювати — скористайтеся друком відомості'); };
+    var old = function () { var ta = document.createElement('textarea'), y = false; ta.value = txt; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:0;top:0;opacity:0'; document.body.appendChild(ta); ta.select(); try { y = document.execCommand('copy'); } catch (e) {} ta.remove(); fin(y); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function () { fin(true); }, old); else old();
   }
   function showDoors() {
     if (C) closeCol();
@@ -6524,14 +6657,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     $('detlist').addEventListener('click', showDoors);
     $('detpanel').addEventListener('click', function (e) {
       var t = e.target && e.target.closest && e.target.closest('[data-det]'); if (!t) return;
-      if (t.getAttribute('data-det') === 'close') return closeDoors();
+      var k = t.getAttribute('data-det'), id = t.getAttribute('data-id');
+      if (k === 'close') { ckAsk = false; return closeDoors(); }
+      if (k === 'ck') { ckSet(id, t.getAttribute('data-s')); return renderDoors(); }
+      if (k === 'prev' || k === 'next') {
+        var ord = []; DOORS.doors.forEach(function (r) { if (ord.indexOf(r.fl) < 0) ord.push(r.fl); });
+        var n = ord.indexOf(detFloor) + (k === 'next' ? 1 : -1); if (n < 0 || n >= ord.length) return;
+        detFloor = ord[n]; renderDoors(); $('detpanel').scrollTop = 0; return;
+      }
+      if (k === 'print') return printSheet();
+      if (k === 'copy') return copySheet();
+      if (k === 'clear') { ckAsk = true; renderDoors(); $('detpanel').scrollTop = $('detpanel').scrollHeight; return; }
+      if (k === 'clear0') { ckAsk = false; return renderDoors(); }
+      if (k === 'clear2') { ckAsk = false; CK = {}; ckSave(); renderDoors(); return toast('Позначки огляду очищено'); }
+      if (k !== 'go') return;
       /* показати доводчик: список згортається в кнопку, у картці відкривається паспорт доводчика */
-      var id = t.getAttribute('data-id'), fl = +t.getAttribute('data-fl'), P = window.P00; $('detpanel').hidden = true; detMini = true; syncUI();
+      var fl = +t.getAttribute('data-fl'), P = window.P00; $('detpanel').hidden = true; detMini = true; syncUI();
       setDetail(true); if (!P || !P.select) return;
       /* спершу відкриваємо поверх дверей: у вигляді всього будинку двері закриті стінами й перекриттями */
       Promise.resolve(A.state.sel.length === 1 && A.state.sel[0] === fl ? 0 : P.setFloors([fl])).then(function () { return P.select(id, true); }).then(function (ok) { if (ok) flyDetail(); });
     });
-    $('detpanel').addEventListener('change', function (e) { if (e.target && e.target.id === 'detfl') { detFloor = +e.target.value; renderDoors(); } });
+    $('detpanel').addEventListener('change', function (e) {
+      var t = e.target; if (!t) return;
+      if (t.id === 'detfl') { detFloor = +t.value; renderDoors(); $('detpanel').scrollTop = 0; }
+      else if (t.classList && t.classList.contains('nt')) ckNote(t.getAttribute('data-id'), t.value);
+    });
     $('xron').addEventListener('change', function (e) { setOn(e.target.checked); });
     $('xrpick').addEventListener('click', function () { if (C) closeCol(); startPick(); });
     $('xrchip').addEventListener('click', function () {
@@ -6568,7 +6718,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     ui(); syncUI();
     window.P00.xray = {
       set: setOn, tap: function (f) { return railTap(+f); }, state: function () { return { on: on, nets: nets, picking: picking, ghost: Object.keys(GS).map(Number).sort(function (p, q) { return p - q; }), column: C ? { x: C.x, y: C.y, floor: C.F, here: C.here && C.here.title, rows: C.rows.map(function (r) { return { floor: r.f.id, title: r.title, key: r.key, sub: r.sub }; }), pipes: C.pipes.map(function (p) { return { name: p.name, d: +p.d.toFixed(2) }; }) } : null }; },
-      pick: startPick, close: closeCol, detail: setDetail, doors: showDoors, closeDoors: closeDoors, flyDetail: flyDetail,
+      pick: startPick, close: closeCol, detail: setDetail, doors: showDoors, closeDoors: closeDoors, flyDetail: flyDetail, check: { set: function (id, st) { ckSet(id, st); if (DOORS && !$('detpanel').hidden) renderDoors(); }, note: ckNote, get: function () { return JSON.parse(JSON.stringify(ckLoad())); }, text: function () { return loadDoors().then(sheetText); }, fill: function () { return loadDoors().then(fillPrint); }, print: printSheet },
       at: function (x, y, F) { return loadCol().then(function () { show(compute(x, y, F)); return window.P00.xray.state().column; }); }
     };
   }
