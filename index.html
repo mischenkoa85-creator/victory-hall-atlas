@@ -46,6 +46,9 @@ button,input,select{font:inherit;color:inherit}
 
 .view{position:relative;min-width:0;min-height:0;background:var(--scene)}
 #gl{position:absolute;inset:0;display:block;width:100%;height:100%;touch-action:none}
+#lbl{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+#lbl svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.tg{position:absolute;left:0;top:0;font:500 12px/15px var(--f-body);padding:3px 7px;border-radius:3px;border:1px solid;white-space:pre;will-change:transform}
 .hud{position:absolute;left:12px;top:12px;display:flex;flex-wrap:wrap;gap:6px;max-width:calc(100% - 90px)}
 .hud button{background:var(--panel);border:1px solid var(--rule);border-radius:3px;padding:5px 9px;font-size:12.5px;cursor:pointer}
 .hud button:hover{border-color:var(--cobalt)}
@@ -165,6 +168,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
 
   <section class="view" aria-label="3D-макет">
     <canvas id="gl"></canvas>
+    <div id="lbl" aria-hidden="true"><svg></svg></div>
     <div class="loading" id="loading">Будую макет…</div>
     <div class="hud" role="toolbar" aria-label="Види">
       <button data-cam="over" class="on">Огляд</button>
@@ -195,6 +199,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
       <h2>Шари</h2>
       <div class="layers" id="layers">
         <label><input type="checkbox" id="L-terrain" checked><span class="sw" style="background:#b9c3a4"></span>Рельєф за відмітками<span class="src">118 точок</span></label>
+        <label><input type="checkbox" id="L-asph" checked><span class="sw" style="background:#868b8f"></span>Асфальт паркінгу<span class="src" id="asph-src">КБ арк. 2.1</span></label>
         <label><input type="checkbox" id="L-kb" checked><span class="sw" style="background:transparent;border-style:dashed"></span>Топооснова<span class="src">т.2 арк. 2.1</span></label>
         <label><input type="checkbox" id="L-etr"><span class="sw" style="background:#9aa"></span>Ситуаційний план<span class="src">т.3 арк. 7</span></label>
         <label><input type="checkbox" id="L-spots"><span class="sw" style="background:#4b8f6b"></span>Висотні відмітки<span class="src">106,94–109,35</span></label>
@@ -205,7 +210,8 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
         <label><input type="checkbox" id="L-brace"><span class="sw" style="background:#d9822b"></span>Підсвітити в'язі Вв1 / Вв2<span class="src">КБ арк. 5</span></label>
         <label><input type="checkbox" id="L-route" checked><span class="sw" style="background:#c0392b"></span>Обладнання і траса DC<span class="src">орієнтовно</span></label>
         <label><input type="checkbox" id="L-util" checked><span class="sw" style="background:#d7261e"></span>Підземні мережі: КЛ 2×10 кВ, зливова<span class="src">КБ арк. 2.1</span></label>
-        <label><input type="checkbox" id="L-axes" checked><span class="sw" style="background:var(--cobalt)"></span>Осі та позначки</label>
+        <label><input type="checkbox" id="L-axes" checked><span class="sw" style="background:var(--cobalt)"></span>Осі та розміри на землі<span class="src">КБ арк. 2</span></label>
+        <label><input type="checkbox" id="L-tags" checked><span class="sw" style="background:#fff"></span>Виноски з підписами<span class="src">без накладань</span></label>
       </div>
       <h2>Рельєф</h2>
       <div class="row"><label for="ex">Вертикальне перебільшення</label><input type="range" id="ex" min="1" max="6" step="0.5" value="1"><output id="exo" for="ex">×1</output></div>
@@ -217,6 +223,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
         <dt>Орієнтація</dt><dd>Осі 1→10: азимут 70,4°; модулі дивляться на 160,4° (ПдПдСх)</dd>
         <dt>Висоти</dt><dd>У системі топозйомки; 0,000 = 107,31 (прийнято в макеті)</dd>
         <dt>Будівля</dt><dd>Контур з т.3 арк. 7, висоти умовні (8 / 5 / 4 м), точність ±3 м</dd>
+        <dt>Асфальт</dt><dd id="asph-dd">Контур за топозйомкою</dd>
       </dl>
     </div>
 
@@ -306,7 +313,7 @@ const ETRTEX = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAkGBwgHB
 (function(){
 "use strict";
 const $ = s => document.querySelector(s), $$ = s => Array.from(document.querySelectorAll(s));
-let need=true; function requestRender(){ need=true; }
+let need=true, occT=0; function requestRender(){ need=true; clearTimeout(occT); occT=setTimeout(()=>{ try{ computeOcc(); need=true; }catch(e){} },220); }
 // ---------- tabs
 $$('.tabs button').forEach(b => b.addEventListener('click', () => {
   $$('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
@@ -433,21 +440,107 @@ G('kb').add(kbMesh);
 const IM = D.etr.img;
 const etrMesh = overlay(ETRTEX, (E,N)=>{ const p=enToPdf(E,N,D.etr); return [(p[0]-IM.x0)/IM.sx/IM.w, 1-((p[1]-IM.y0)/IM.sy)/IM.h]; }, {opacity:0.92});
 etrMesh.renderOrder=0; G('etr').add(etrMesh);
+kbMesh.position.y=0.07; etrMesh.position.y=0.065;   // drawn over the asphalt
 
 // ---------- helpers
-const labels=[]; let LH=800;
-function label(text, opt){
-  opt=opt||{}; const fs=40, pad=12, dpr=2;
-  const c=document.createElement('canvas'), x=c.getContext('2d');
-  x.font=`500 ${fs}px "JetBrains Mono", monospace`; const w=Math.ceil(x.measureText(text).width)+pad*2, h=Math.round(fs+pad*1.3);
-  if(opt.circle){ c.width=c.height=h; x.font=`600 ${fs}px "JetBrains Mono", monospace`; x.fillStyle=opt.bg||'#fff'; x.beginPath(); x.arc(h/2,h/2,h/2-3,0,7); x.fill(); x.lineWidth=4; x.strokeStyle=opt.fg||'#2446A3'; x.stroke(); x.fillStyle=opt.fg||'#2446A3'; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,h/2,h/2+2); }
-  else { c.width=w; c.height=h; x.font=`500 ${fs}px "JetBrains Mono", monospace`; x.fillStyle=opt.bg||'rgba(255,255,255,0.9)'; x.fillRect(0,0,w,h); x.fillStyle=opt.fg||'#162026'; x.textBaseline='middle'; x.fillText(text,pad,h/2+1); }
-  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; t.minFilter=THREE.LinearFilter;
-  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t, depthTest:opt.depthTest!==false, transparent:true, sizeAttenuation:false}));
-  s.userData.px=opt.px||18; s.userData.asp=c.width/c.height; s.renderOrder=opt.depthTest===false?20:5; labels.push(s);
-  const f0=2*Math.tan(camera.fov*Math.PI/360)/LH; s.scale.set(s.userData.px*f0*s.userData.asp, s.userData.px*f0, 1); return s;
+// ---------- labels
+// 1) decals: text painted flat on the ground or on the modules. They stay where they are and only
+//    turn by 180° (circles by 90°) so the text never reads upside down.
+// 2) callouts: 2D labels on an overlay canvas with a leader to the object. Laid out every frame so they
+//    don't overlap each other, other anchors or the toolbar; hidden beyond `far` metres; dimmed when
+//    the object is behind the building or the modules.
+function rr(x,l,t,w,h,r){ x.beginPath(); x.moveTo(l+r,t); x.lineTo(l+w-r,t); x.quadraticCurveTo(l+w,t,l+w,t+r); x.lineTo(l+w,t+h-r); x.quadraticCurveTo(l+w,t+h,l+w-r,t+h); x.lineTo(l+r,t+h); x.quadraticCurveTo(l,t+h,l,t+h-r); x.lineTo(l,t+r); x.quadraticCurveTo(l,t,l+r,t); x.closePath(); }
+const DECALS=[];
+function decalCanvas(text,o){
+  const c=document.createElement('canvas'), x=c.getContext('2d'), fam='"JetBrains Mono", ui-monospace, monospace';
+  if(o.circle){ const d=112; c.width=c.height=d; x.fillStyle=o.bg; x.beginPath(); x.arc(d/2,d/2,d/2-5,0,7); x.fill(); x.lineWidth=7; x.strokeStyle=o.fg; x.stroke();
+    x.font=`600 ${text.length>1?56:68}px ${fam}`; x.fillStyle=o.fg; x.textAlign='center'; x.textBaseline='middle'; x.fillText(text,d/2,d/2+5); return c; }
+  const fs=72, font=`600 ${fs}px ${fam}`; x.font=font;
+  const tw=Math.ceil(x.measureText(text).width), dot=o.dot?fs*0.95:0, pad=24, h=Math.round(fs*1.34);
+  c.width=tw+pad*2+dot; c.height=h; x.fillStyle=o.bg; rr(x,0,0,c.width,h,h*0.2); x.fill();
+  if(o.dot){ x.fillStyle=o.dot; x.beginPath(); x.arc(pad+fs*0.34,h/2,fs*0.34,0,7); x.fill(); }
+  x.font=font; x.fillStyle=o.fg; x.textBaseline='middle'; x.fillText(text,pad+dot,h/2+4); return c;
 }
-function sizeLabels(h){ LH=h; const f=2*Math.tan(camera.fov*Math.PI/360)/h; labels.forEach(s=>{ const py=s.userData.px*f; s.scale.set(py*s.userData.asp, py, 1); }); }
+function paintDecal(d){ const c=decalCanvas(d.text,d.o); d.tex.image=c; d.tex.needsUpdate=true; d.mesh.scale.set(d.o.h*c.width/c.height,d.o.h,1); }
+function decal(text,o){
+  o=Object.assign({h:0.6,fg:'#162026',bg:'rgba(255,255,255,0.9)'},o);
+  const tex=new THREE.CanvasTexture(document.createElement('canvas')); tex.encoding=THREE.sRGBEncoding; tex.anisotropy=renderer.capabilities.getMaxAnisotropy();
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial({map:tex,transparent:true,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-4,polygonOffsetUnits:-4}));
+  mesh.rotation.x=-Math.PI/2; mesh.renderOrder=3;
+  const holder=new THREE.Object3D(); holder.add(mesh); holder.rotation.y=o.rot||0;
+  const d={text,o,tex,mesh,holder,base:o.rot||0,snap:o.circle?Math.PI/2:Math.PI,k:0}; DECALS.push(d); paintDecal(d); return holder;
+}
+const _q=new THREE.Quaternion(), _f=new THREE.Vector3(), _g=new THREE.Vector3();
+function orientDecals(){
+  _f.subVectors(controls.target,camera.position);
+  for(const d of DECALS){ const p=d.holder.parent; if(!p||!p.visible) continue;
+    p.getWorldQuaternion(_q); _g.copy(_f).applyQuaternion(_q.invert()); if(_g.x*_g.x+_g.z*_g.z<1e-8) continue;
+    const want=Math.atan2(-_g.x,-_g.z); let dl=want-(d.base+d.k*d.snap); dl=Math.atan2(Math.sin(dl),Math.cos(dl));
+    if(Math.abs(dl)>d.snap/2+0.12){ let a=want-d.base; a=Math.atan2(Math.sin(a),Math.cos(a)); d.k=Math.round(a/d.snap); d.holder.rotation.y=d.base+d.k*d.snap; } }
+}
+
+const lbox=$('#lbl'), lsvg=lbox.querySelector('svg'), SVGNS='http://www.w3.org/2000/svg';
+const TAGS=[]; let OW=0, OH=0, tagsOn=true;
+function tag(text,o){ const a=new THREE.Object3D(); a.userData.tag=Object.assign({text:String(text),bg:'rgba(255,255,255,0.95)',fg:'#162026',line:'#2b3a42',pri:5,far:Infinity,c:-1,occ:false,w:0,el:null,shown:false},o||{}); TAGS.push(a); return a; }
+function measureTag(t){ const s=t.el.style; s.visibility='hidden'; s.display='block'; t.w=t.el.offsetWidth; t.h=t.el.offsetHeight; s.display=t.shown?'block':'none'; s.visibility=''; }
+function tagEl(t){
+  if(!t.el){ const d=document.createElement('div'); d.className='tg'; d.textContent=t.text; d.style.background=t.bg; d.style.color=t.fg; d.style.borderColor=t.line+'73'; d.style.display='none'; lbox.appendChild(d);
+    const g=document.createElementNS(SVGNS,'g'), ln=document.createElementNS(SVGNS,'line'), c=document.createElementNS(SVGNS,'circle');
+    ln.setAttribute('stroke',t.line); ln.setAttribute('stroke-width','1.2'); c.setAttribute('r','3'); c.setAttribute('fill',t.line); c.setAttribute('stroke','#fff'); c.setAttribute('stroke-width','1.2');
+    g.appendChild(ln); g.appendChild(c); g.style.display='none'; lsvg.appendChild(g); Object.assign(t,{el:d,g,ln,dot:c,w:0}); }
+  if(!t.w) measureTag(t);
+}
+function hideTag(t){ if(t.shown){ t.el.style.display='none'; t.g.style.display='none'; t.shown=false; } }
+function sizeOverlay(w,h){ OW=w; OH=h; }
+const CANDS=[]; [16,32,52,80].forEach(L=>[[1,-1],[-1,-1],[1,1],[-1,1],[0,-1],[1,0],[-1,0],[0,1]].forEach(([dx,dy])=>{ const f=dx&&dy?0.72:1; CANDS.push([dx*L*f,dy*L*f,dx,dy]); }));
+const _p=new THREE.Vector3(), overlap=(r,L)=>L.some(q=>r[0]<q[2]&&r[2]>q[0]&&r[1]<q[3]&&r[3]>q[1]);
+function liveTags(){ const out=[]; for(let i=TAGS.length-1;i>=0;i--){ const a=TAGS[i]; let p=a, vis=true; while(p&&p!==scene){ if(!p.visible) vis=false; p=p.parent; }
+  if(!p){ const t=a.userData.tag; if(t.el){ t.el.remove(); t.g.remove(); } TAGS.splice(i,1); continue; } if(vis) out.push(a); } return out; }
+// screen quad of the module field: callouts try to stay off it, and only sit on it when there is no other room
+function roofQuad(){
+  if(!(SG.pv.visible||SG.raf.visible)) return null;
+  const W=46*PITCH, q=[[MODX0-0.1,0.2,0.6],[MODX0+W+0.1,0.2,0.6],[MODX0+W+0.1,0.2,-9.7],[MODX0-0.1,0.2,-9.7]].map(p=>{ _p.set(p[0],p[1],p[2]); roof.localToWorld(_p); _p.project(camera); return [_p.x,_p.y,_p.z]; });
+  if(q.some(p=>p[2]>1)) return null;
+  return q.map(p=>[(p[0]+1)/2*OW,(1-p[1])/2*OH]);
+}
+function inQuad(Q,x,y){ let s=0; for(let i=0;i<4;i++){ const a=Q[i], b=Q[(i+1)%4], c=(b[0]-a[0])*(y-a[1])-(b[1]-a[1])*(x-a[0]); if(c===0) continue; if(!s) s=Math.sign(c); else if(Math.sign(c)!==s) return false; } return true; }
+function quadHit(Q,r){ if(!Q) return false; const xs=[r[0],(r[0]+r[2])/2,r[2]], ys=[r[1],(r[1]+r[3])/2,r[3]];
+  for(const x of xs) for(const y of ys) if(inQuad(Q,x,y)) return true;
+  return Q.some(p=>p[0]>r[0]&&p[0]<r[2]&&p[1]>r[1]&&p[1]<r[3]); }
+function drawTags(){
+  const live=liveTags(), placed=new Set();
+  if(tagsOn&&OW){
+    const vr=canvas.getBoundingClientRect(), block=[];
+    ['.hud','.compass','#stepbar','#sunread'].forEach(sel=>{ const e=$(sel); if(!e||e.hidden) return; const r=e.getBoundingClientRect(); if(r.width) block.push([r.left-vr.left-6,r.top-vr.top-6,r.right-vr.left+6,r.bottom-vr.top+6]); });
+    const items=[];
+    live.forEach(a=>{ const t=a.userData.tag; a.getWorldPosition(_p); const dist=_p.distanceTo(camera.position); if(dist>t.far) return;
+      _p.project(camera); if(_p.z>1) return; const x=(_p.x+1)/2*OW, y=(1-_p.y)/2*OH; if(x<3||y<3||x>OW-3||y>OH-3) return; items.push({t,x,y,dist}); });
+    items.sort((a,b)=>b.t.pri-a.t.pri||a.dist-b.dist);
+    items.forEach(it=>block.push([it.x-5,it.y-5,it.x+5,it.y+5]));
+    const RQ=roofQuad();
+    for(const it of items){ const t=it.t; tagEl(t);
+      let got=null;
+      const tryK=(k,soft)=>{ const c=CANDS[k], ex=it.x+c[0], ey=it.y+c[1];
+        const l=c[2]>0?ex:c[2]<0?ex-t.w:ex-t.w/2, tp=c[3]<0?ey-t.h:c[3]>0?ey:ey-t.h/2, r=[l,tp,l+t.w,tp+t.h];
+        if(l<4||tp<4||r[2]>OW-4||r[3]>OH-4||overlap(r,block)||(soft&&quadHit(RQ,r))) return false; got={k,r,ex,ey}; return true; };
+      for(const soft of [true,false]){ if(t.c>=0&&tryK(t.c,soft)) break; let k=0; for(;k<CANDS.length;k++) if(tryK(k,soft)) break; if(got) break; }
+      t.c=got?got.k:-1; if(!got) continue;
+      block.push([got.r[0]-3,got.r[1]-3,got.r[2]+3,got.r[3]+3]); placed.add(t);
+      if(!t.shown){ t.el.style.display='block'; t.g.style.display=''; t.shown=true; }
+      const op=t.occ?'0.42':'1'; t.el.style.opacity=op; t.g.style.opacity=op;
+      t.el.style.transform=`translate(${Math.round(got.r[0])}px,${Math.round(got.r[1])}px)`;
+      t.ln.setAttribute('x1',it.x.toFixed(1)); t.ln.setAttribute('y1',it.y.toFixed(1)); t.ln.setAttribute('x2',got.ex.toFixed(1)); t.ln.setAttribute('y2',got.ey.toFixed(1));
+      t.dot.setAttribute('cx',it.x.toFixed(1)); t.dot.setAttribute('cy',it.y.toFixed(1)); }
+  }
+  for(const a of TAGS){ const t=a.userData.tag; if(!placed.has(t)) hideTag(t); }
+}
+const occRay=new THREE.Raycaster();
+function computeOcc(){
+  const occ=[]; if(groups.bld.visible&&!bMat.transparent) occ.push(...bMeshes); if(SG.pv.visible) occ.push(window.__modules);
+  for(const a of liveTags()){ const t=a.userData.tag; if(t.noOcc||!occ.length){ t.occ=false; continue; }
+    a.getWorldPosition(_p); const dd=_p.distanceTo(camera.position); occRay.set(camera.position,_p.sub(camera.position).normalize()); occRay.far=Math.max(0,dd-0.35);
+    t.occ=occRay.intersectObjects(occ,false).length>0; }
+}
 const UP = new THREE.Vector3(0,1,0);
 function member(a,b,w,h,mat){ const A=new THREE.Vector3(...a), B=new THREE.Vector3(...b); const d=B.clone().sub(A), L=d.length();
   const m=new THREE.Mesh(new THREE.BoxGeometry(w,L,h), mat); m.position.copy(A).add(B).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(UP, d.normalize()); m.castShadow=true; m.receiveShadow=true; return m; }
@@ -477,6 +570,55 @@ const groundRel=(ax,row)=>D.cols.find(c=>c.ax===ax&&c.row===row).g-ZERO;
 const ROWS=[['А',0,yAtop],['Б',SPAN,yBtop]];
 function box(w,h,d,mat,x,y,z){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; return m; }
 
+// --- asphalt of the parking. Outline traced on the survey (КБ арк. 2.1) in the carport frame:
+//     «А» marks inside, lawn «v» marks north of the row Б edge, west of the stadium fence and on the street slope.
+const ASPH=[[-7.2,8.6],[57.8,8.8],[57.3,-14.6],[-7.4,-16.2]];
+const shoe=P=>P.reduce((a,p,i)=>{ const q=P[(i+1)%P.length]; return a+p[0]*q[1]-q[0]*p[1]; },0)/2;
+const ASPH_AREA=Math.abs(shoe(ASPH)), ASPH_COL=0x666b6f;
+const gLoc=(x,y)=>{ const e=l2e(x,y); return (groundAt(e[0],e[1])-ZERO)*EX; };   // ground in the carport frame
+const asphG=new THREE.Group(); asphG.name='asph'; carport.add(asphG); groups.asph=asphG;
+const asphTex=(function(){ const c=document.createElement('canvas'); c.width=c.height=256; const x=c.getContext('2d'); x.fillStyle='#d6d6d6'; x.fillRect(0,0,256,256);
+  let sd=11; const rnd=()=>{ sd=(sd*16807)%2147483647; return sd/2147483647; };
+  for(let i=0;i<14000;i++){ const v=Math.round(150+rnd()*105); x.fillStyle=`rgb(${v},${v},${v})`; const r=0.7+rnd()*1.8; x.fillRect(rnd()*256,rnd()*256,r,r); }
+  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.anisotropy=8; t.encoding=THREE.sRGBEncoding; return t; })();
+const aMat=new THREE.MeshLambertMaterial({color:ASPH_COL, map:asphTex, side:THREE.DoubleSide, polygonOffset:true, polygonOffsetFactor:-1, polygonOffsetUnits:-1});
+const asphCut=new THREE.MeshLambertMaterial({color:0x2a2d30, side:THREE.BackSide});
+function asphRing(h){ const g=new THREE.CylinderGeometry(h*Math.SQRT2,h*Math.SQRT2,0.12,4,1,true); g.rotateY(Math.PI/4); return g; }  // 120 mm of asphalt seen in the pit wall
+const asph=(function(){
+  const xs=new Set(), ys=new Set();
+  for(let x=-8;x<=59;x++) xs.add(x); for(let y=-17;y<=9;y++) ys.add(y);
+  AX.forEach(x=>[0.8,0.65].forEach(h=>{ xs.add(+(x-h).toFixed(3)); xs.add(+(x+h).toFixed(3)); }));
+  [0,SPAN].forEach(y=>[0.8,0.65].forEach(h=>{ ys.add(+(y-h).toFixed(3)); ys.add(+(y+h).toFixed(3)); }));
+  const XS=[...xs].sort((a,b)=>a-b), YS=[...ys].sort((a,b)=>a-b), sgn=Math.sign(shoe(ASPH));
+  const clip=poly=>{ let out=poly;
+    for(let e=0;e<ASPH.length&&out.length;e++){ const A=ASPH[e], B=ASPH[(e+1)%ASPH.length], side=p=>sgn*((B[0]-A[0])*(p[1]-A[1])-(B[1]-A[1])*(p[0]-A[0])), inp=out; out=[];
+      for(let k=0;k<inp.length;k++){ const P=inp[k], R=inp[(k+1)%inp.length], sp=side(P), sr=side(R); if(sp>=0) out.push(P); if((sp>=0)!==(sr>=0)){ const t=sp/(sp-sr); out.push([P[0]+(R[0]-P[0])*t, P[1]+(R[1]-P[1])*t]); } } }
+    return out; };
+  const inSq=(x,y,h)=>AX.some(a=>Math.abs(x-a)<h)&&(Math.abs(y)<h||Math.abs(y-SPAN)<h);
+  const L=[[],[],[]];   // 0: always; 1: inside 1,6 m pits only; 2: inside 1,3 m pits
+  for(let i=0;i<XS.length-1;i++) for(let j=0;j<YS.length-1;j++){
+    const x0=XS[i], x1=XS[i+1], y0=YS[j], y1=YS[j+1], cx=(x0+x1)/2, cy=(y0+y1)/2;
+    const pg=clip([[x0,y0],[x1,y0],[x1,y1],[x0,y1]]); if(pg.length<3) continue;
+    const cls=inSq(cx,cy,0.65)?2:inSq(cx,cy,0.8)?1:0;
+    for(let k=1;k<pg.length-1;k++) L[cls].push(pg[0],pg[k],pg[k+1]);
+  }
+  const all=L[0].concat(L[1],L[2]), n=all.length, xy=new Float32Array(n*2), uv=new Float32Array(n*2);
+  all.forEach((v,k)=>{ xy[k*2]=v[0]; xy[k*2+1]=v[1]; uv[k*2]=v[0]/3; uv[k*2+1]=v[1]/3; });
+  const g=new THREE.BufferGeometry(); g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(n*3),3)); g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  const m=new THREE.Mesh(g,aMat); m.receiveShadow=true; m.renderOrder=0.5; asphG.add(m);
+  return {g,xy,n,cut:{full:n, pre:L[0].length+L[1].length, mono:L[0].length}};
+})();
+function placeAsph(){ const P=asph.g.attributes.position.array, xy=asph.xy, memo=new Map();
+  for(let k=0;k<asph.n;k++){ const x=xy[k*2], y=xy[k*2+1], key=x.toFixed(3)+'|'+y.toFixed(3); let h=memo.get(key); if(h===undefined){ h=gLoc(x,y)+0.03; memo.set(key,h); }
+    P[k*3]=x; P[k*3+1]=h; P[k*3+2]=-y; }
+  asph.g.attributes.position.needsUpdate=true; asph.g.computeVertexNormals(); asph.g.computeBoundingSphere(); }
+function asphMode(m){ asph.g.setDrawRange(0,asph.cut[m]); }
+function setGround(tOp,aOp){
+  tMat.transparent=tOp<1; tMat.opacity=tOp; tMat.depthWrite=tOp>=1; tMat.needsUpdate=true;
+  aMat.transparent=aOp<1; aMat.opacity=aOp; aMat.depthWrite=aOp>=1; aMat.needsUpdate=true; }
+$('#asph-src').textContent=`≈${nf(ASPH_AREA,0)} м²`;
+$('#asph-dd').textContent=`Паркінг ≈${nf(ASPH_AREA,0)} м² — контур за топозйомкою (позначки «А», межі газону); товщина ≈12 см за ВОР`;
+
 // --- step 1–3: pits, prep, rebar, concrete, anchors
 const pitMat=new THREE.MeshLambertMaterial({color:0x6e4b2a, side:THREE.BackSide});
 const pitEdge=new THREE.LineBasicMaterial({color:0x4a3018});
@@ -486,10 +628,11 @@ const rebarSeg={10:[],6:[]}, anchorPos=[];
 AX.forEach((x,i)=>{ ROWS.forEach(([row,y])=>{
   const z=-y, g=groundRel(i+1,row), depth=g+1.2;
   const pit=box(1.6,depth,1.6,pitMat,x,-1.2+depth/2,z); pit.castShadow=false;
-  const rim=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-0.8,-0.8],[0.8,-0.8],[0.8,0.8],[-0.8,0.8]].map(([u,v])=>new THREE.Vector3(x+u,g+0.01,z+v))),pitEdge); SG.pits.add(rim);
+  const rim=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-0.8,-0.8],[0.8,-0.8],[0.8,0.8],[-0.8,0.8]].map(([u,v])=>new THREE.Vector3(x+u,g+0.045,z+v))),pitEdge); SG.pits.add(rim);
   const heap=new THREE.Mesh(new THREE.ConeGeometry(1.05,0.8,7),heapMat); heap.position.set(x+1.9,g+0.45,z+(row==='А'?1.2:-1.2)); heap.castShadow=true; SG.pits.add(heap);
   info(pit,`Яма під ФМ1 · вісь ${i+1}/${row}\n1,6 × 1,6 × ${nf(depth,2)} м = ${nf(1.6*1.6*depth,2)} м³\nдно −1,200 (абс. ${nf(ZERO-1.2,2)})`);
   SG.pits.add(pit);
+  const ar=new THREE.Mesh(asphRing(0.795),asphCut); ar.position.set(x,g-0.03,z); SG.pits.add(ar);
   SG.prep.add(info(box(1.0,0.1,1.0,prepMat,x,-1.15,z),`Підготовка С8/10 · ${i+1}/${row}\n1,0 × 1,0 × 0,1 = 0,10 м³`));
   const p1=box(0.4,0.9,0.4,concrete,x,-0.45,z), p2=box(0.8,0.2,0.8,concrete,x,-1.0,z);
   info(p1,`ФМ1 · вісь ${i+1}/${row} · С16/20 F75 W4\nпідколонник 0,4×0,4×0,9 + підошва 0,8×0,8×0,2\n= 0,272 м³; арматура ≈10,4 кг`);
@@ -525,7 +668,8 @@ AX.forEach((x,i)=>{ ROWS.forEach(([row,y])=>{
   const pit=box(1.3,depth,1.3,pitMat,x,-1.23+depth/2,z); pit.castShadow=false;
   info(pit,`Яма під ФМ1-З · вісь ${i+1}/${row}\n1,3 × 1,3 × ${nf(depth,2)} м = ${nf(1.69*depth,2)} м³\nдно −1,230: щебінь 100 + ЦПС 30`);
   SG.pitsP.add(pit);
-  SG.pitsP.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-0.65,-0.65],[0.65,-0.65],[0.65,0.65],[-0.65,0.65]].map(([u,v])=>new THREE.Vector3(x+u,g+0.01,z+v))),pitEdge));
+  const arP=new THREE.Mesh(asphRing(0.645),asphCut); arP.position.set(x,g-0.03,z); SG.pitsP.add(arP);
+  SG.pitsP.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints([[-0.65,-0.65],[0.65,-0.65],[0.65,0.65],[-0.65,0.65]].map(([u,v])=>new THREE.Vector3(x+u,g+0.045,z+v))),pitEdge));
   const heap=new THREE.Mesh(new THREE.ConeGeometry(0.85,0.65,7),heapMat); heap.position.set(x+1.6,g+0.32,z+(row==='А'?1.0:-1.0)); heap.castShadow=true; SG.pitsP.add(heap);
   SG.pbase.add(info(box(1.3,0.1,1.3,stoneMat,x,-1.18,z),`Щебенева подушка фр. 20–40 · ${i+1}/${row}\n1,3 × 1,3 × 0,10 м, ущільнена`));
   SG.pbase.add(info(box(1.0,0.03,1.0,cpsMat,x,-1.115,z),'Вирівнюючий шар ЦПС М100, 30 мм\nверх −1,100 = низ блока'));
@@ -549,9 +693,9 @@ function preBlock(mat, withLoop){
   let n=0;
   for(let k=0;k<10;k++) [-0.55,0.55].forEach(dz=>{ const x=gx-5.8+k*1.05; T.add(box(0.9,0.06,0.1,wood,x,deck+0.03,gz+dz-0.25), box(0.9,0.06,0.1,wood,x,deck+0.03,gz+dz+0.25));
     const b=preBlock(preMat); b.position.set(x,deck+0.06+1.1,gz+dz); b.children.slice(0,2).forEach(m=>info(m,`Блок ФМ1-З №${++n} · ≈${nf(PRE.blk_kg,0)} кг\n800×800×200 + 400×400×900\n4 шпильки М20, петля Ø14`)); T.add(b); });
-  const lb=label(`20 блоків ФМ1-З · ≈${nf(PRE.tot_t,1)} т · 1 рейс`,{px:15,depthTest:false}); lb.position.set(gx-1,deck+2.2,gz); T.add(lb);
+  const lb=tag(`20 блоків ФМ1-З · ≈${nf(PRE.tot_t,1)} т · 1 рейс`,{pri:7,far:90}); lb.position.set(gx-1,deck+1.3,gz); T.add(lb);
   // cut-away detail block on pallets
-  const dx=17, dzz=4.2, e=l2e(dx,-dzz), gR=groundAt(e[0],e[1])-ZERO;
+  const dx=14.5, dzz=4.4, e=l2e(dx,-dzz), gR=groundAt(e[0],e[1])-ZERO;
   const D1=new THREE.Group(); D1.position.set(dx,gR+0.1+1.1,dzz); T.add(D1);
   [-0.25,0.25].forEach(o=>D1.add(box(1.0,0.1,0.1,wood,0,-1.15,o)));
   const glass=new THREE.MeshLambertMaterial({color:0xb5b0a7,transparent:true,opacity:0.28,depthWrite:false});
@@ -571,7 +715,7 @@ function preBlock(mat, withLoop){
   const loop=new THREE.Group(); loop.add(new THREE.Mesh(new THREE.TorusGeometry(0.06,0.009,6,14,Math.PI),rebarMat));
   [-0.06,0.06].forEach(x=>{ const l=new THREE.Mesh(new THREE.CylinderGeometry(0.009,0.009,0.45,6),rebarMat); l.position.set(x,-0.225,0); loop.add(l); });
   loop.position.y=0.04; info(loop.children[0],'Монтажна петля Ø14 А240С, L ≈ 1 м\nпо центру; після монтажу зрізати'); D1.add(loop);
-  [['ФМ1-З · збірний · 20 шт',0,0.75,0,16],['підколонник 400×400×900',0.62,-0.45,0,13],['підошва 800×800×200',0.75,-1.0,0.2,13],['4 × М20, виступ 110',-0.6,0.2,0,13]].forEach(([t,x,y,z,px])=>{ const l=label(t,{px,depthTest:false}); l.position.set(x,y,z); D1.add(l); });
+  [['ФМ1-З · збірний · 20 шт',0,0.16,0,8],['підколонник 400×400×900',0.2,-0.45,0,6],['підошва 800×800×200',0.4,-1.0,0.2,6],['4 × М20, виступ 110',-0.1,0.11,-0.1,6]].forEach(([t,x,y,z,pri])=>{ const l=tag(t,{pri,far:30,noOcc:true}); l.position.set(x,y,z); D1.add(l); });
 })();
 
 
@@ -646,7 +790,7 @@ const modString=new Array(184).fill(-1);
 Q.strings.forEach((s,i)=>{ for(let k=s.k0;k<=s.k1;k++) modString[s.row*46+k]=i; });
 Q.strings.forEach((s,i)=>{
   const sc=s.row*2.29+1.139, cx=MODX0+((s.k0+s.k1+1)/2)*PITCH;
-  const l=label(`${s.id} · MPPT${s.mppt}.${s.inp} · ${s.n} шт`,{px:14,bg:SCOL[i],fg:'#111',depthTest:false}); l.position.set(cx,0.75,-sc); SG.strings.add(l);
+  const l=decal(`${s.id} · MPPT${s.mppt}.${s.inp} · ${s.n} шт`,{h:0.8,fg:'#fff',bg:'rgba(17,22,28,0.84)',dot:SCOL[i]}); l.position.set(cx,0.31,-sc); SG.strings.add(l);
   const xa=MODX0+s.k0*PITCH+0.05, xb=MODX0+(s.k1+1)*PITCH-0.07, top=GEO.raf-0.3;
   const mk=(pts,c)=>{ const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts.map(p=>new THREE.Vector3(p[0],0.1,-p[1]))), new THREE.LineBasicMaterial({color:c})); SG.strings.add(ln); };
   mk([[xa,sc-0.25],[5.5,sc-0.25],[5.5,top]],SCOL[i]); mk([[xb,sc+0.25],[5.5+0.06,sc+0.25],[5.5+0.06,top]],SCOL[i]);
@@ -664,22 +808,36 @@ function colorModules(on){ const im=window.__modules, c=new THREE.Color();
     [6.66,0.52,0.32,0x6a7f72,3.1,-0.65,'Ст1 + Вв1 □100×3 — 40 шт'],[5.9,0.36,0.25,0x7c8f9a,3.8,0.15,'Вв2 □60×4 — 45 шт']];
   let y=gy+1.36; const yy={};
   bund.forEach(([L,w,h,c,dx,dz,txt],i)=>{ const key=dz.toFixed(2); const base=yy[key]||y; const b=box(L,h,w,new THREE.MeshLambertMaterial({color:c}),gx+dx,base+h/2,gz+dz); yy[key]=base+h+0.02; info(b,txt); T.add(b); });
-  const lb=label('Площадка 13,6 × 2,45 м · ≈13,1 т металу',{px:15,depthTest:false}); lb.position.set(gx,gy+4.2,gz); T.add(lb);
+  const lb=tag('Площадка 13,6 × 2,45 м · ≈13,1 т металу',{pri:7,far:90}); lb.position.set(gx-1,gy+2.2,gz); T.add(lb);
 })();
 
-// axis bubbles and elevation marks
-const AC = '#2446A3';
-AX.forEach((x,i)=>{ const s=label(String(i+1),{circle:true,px:22,fg:AC}); s.position.set(x,0.6,2.4); axG.add(s); });
-[['А',0],['Б',SPAN]].forEach(([t,y])=>{ const s=label(t,{circle:true,px:22,fg:AC}); s.position.set(-2.4,0.6,-y); axG.add(s); });
-(function(){ const s=label('53 000',{px:17}); s.position.set(26.5,0.4,3.6); axG.add(s);
-  const s2=label('7 820',{px:17}); s2.position.set(-3.8,0.4,-SPAN/2); axG.add(s2);
-  const a=label('+4,500',{px:17}); a.position.set(-1.2,yAtop+0.5,0.6); axG.add(a);
-  const b=label('+6,595',{px:17}); b.position.set(-1.2,yBtop+0.5,-SPAN-0.6); axG.add(b);
-  const z=label('0,000 = 107,31',{px:15}); z.position.set(-7.5,0.3,0.6); axG.add(z);
-  const lm=new THREE.LineBasicMaterial({color:AC}); const pts=[new THREE.Vector3(0,0.12,1.6),new THREE.Vector3(53,0.12,1.6)];
-  axG.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),lm));
-  AX.forEach(x=>{ const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x,0.12,1.9),new THREE.Vector3(x,0.12,-SPAN-0.4)]), new THREE.LineDashedMaterial({color:AC,dashSize:0.6,gapSize:0.3})); ln.computeLineDistances(); axG.add(ln); });
-})();
+// axes, dimensions and 0.000 painted on the ground like a drawing; the two elevations are callouts
+const AC = '#2446A3', AXY=-4.6;
+const axDec=[];
+function axDecal(text,x,y,o){ const h=decal(text,Object.assign({fg:AC,bg:'rgba(255,255,255,0.9)'},o)); h.userData.xy=[x,y]; axG.add(h); axDec.push(h); return h; }
+AX.forEach((x,i)=>axDecal(String(i+1),x,AXY,{circle:true,h:1.6}));
+[['А',0],['Б',SPAN]].forEach(([t,y])=>axDecal(t,AXY,y,{circle:true,h:1.6}));
+AX.slice(1).forEach((x,i)=>axDecal(i===0||i===8?'5 500':'6 000',(AX[i]+x)/2,-2.1,{h:0.4}));
+axDecal('53 000',26.5,-3.0,{h:0.5});
+axDecal('7 820',-1.78,SPAN/2,{h:0.5,rot:Math.PI/2});
+axDecal('0,000 = 107,31',-1.6,-6.1,{h:0.45});
+(function(){ const a=tag('+4,500',{pri:3,far:60}); a.position.set(0,yAtop,0); axG.add(a);
+  const b=tag('+6,595',{pri:3,far:60}); b.position.set(0,yBtop,-SPAN); axG.add(b); })();
+const axLines=new THREE.Group(); axG.add(axLines);
+const axLM=new THREE.LineBasicMaterial({color:AC}), axDM=new THREE.LineDashedMaterial({color:AC,dashSize:0.6,gapSize:0.3});
+function placeAxes(){
+  axDec.forEach(h=>{ const [x,y]=h.userData.xy; h.position.set(x,gLoc(x,y)+0.05,-y); });
+  while(axLines.children.length){ const c=axLines.children[axLines.children.length-1]; axLines.remove(c); c.geometry.dispose(); }
+  const run=(a,b)=>{ const n=Math.max(1,Math.ceil(Math.hypot(b[0]-a[0],b[1]-a[1]))), pts=[]; for(let k=0;k<=n;k++){ const t=k/n, x=a[0]+(b[0]-a[0])*t, y=a[1]+(b[1]-a[1])*t; pts.push(new THREE.Vector3(x,gLoc(x,y)+0.06,-y)); } return pts; };
+  const solid=[], add=(a,b)=>{ const p=run(a,b); for(let k=0;k<p.length-1;k++) solid.push(p[k],p[k+1]); };
+  const dashed=(a,b)=>{ const ln=new THREE.Line(new THREE.BufferGeometry().setFromPoints(run(a,b)),axDM); ln.computeLineDistances(); axLines.add(ln); };
+  AX.forEach(x=>dashed([x,AXY+0.75],[x,SPAN+0.6]));
+  [0,SPAN].forEach(y=>dashed([AXY+0.75,y],[53.6,y]));
+  add([-0.3,-2.5],[53.3,-2.5]); add([-0.3,-3.4],[53.3,-3.4]); add([-1.4,-0.3],[-1.4,SPAN+0.3]);
+  const tick=(x,y)=>add([x-0.18,y-0.18],[x+0.18,y+0.18]);
+  AX.forEach(x=>tick(x,-2.5)); tick(0,-3.4); tick(53,-3.4); tick(-1.4,0); tick(-1.4,SPAN);
+  axLines.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(solid),axLM));
+}
 
 // ---------- buildings
 const bG = G('bld');
@@ -699,7 +857,7 @@ const eq = D.equip;
 const eqBox = new THREE.Mesh(new THREE.BoxGeometry(3.1,2.6,2.3), new THREE.MeshLambertMaterial({color:0xc0392b})); eqBox.castShadow=true;
 info(eqBox, 'Прим. 2, 8,0 м² (ЕТР арк. 18, 21)\nінвертор Deye 80 кВт, 3 стійки BOS-B\n14 × 14,3 кВт·год ≈ 1,8 т\nрозміщення за т.3 арк. 7 (±3 м)');
 rG.add(eqBox);
-const eqLbl = label('Інвертор + АКБ · прим. 2',{px:18,bg:'rgba(192,57,43,0.95)',fg:'#fff',depthTest:false}); rG.add(eqLbl);
+const eqLbl = tag('Інвертор + АКБ · прим. 2',{bg:'rgba(192,57,43,0.95)',fg:'#fff',line:'#c0392b',pri:6,noOcc:true}); rG.add(eqLbl);
 const routeStart = l2e(5.5, SPAN);
 const routePts = [routeStart, [routeStart[0]+1.5, routeStart[1]+6], [eq[0], eq[1]-2]];
 let routeLine=null;
@@ -714,9 +872,10 @@ D.spots.forEach(([E,N,H])=>{ const c=rampCol(H); const m=new THREE.Mesh(spGeo, n
 
 // ---------- underground utilities from the survey (КБ арк. 2.1): КЛ 2×10 кВ and storm sewer
 const utilG=G('util');
+let riskOn=false, riskG=null;   // pit-to-cable callouts only while the pits are open
 const PIT_RISK=[[7,'Б',0.0],[8,'Б',0.59],[9,'Б',0.74],[10,'Б',0.73],[6,'Б',1.57],[6,'А',1.69],[7,'А',2.99],[10,'А',3.21]];
 function buildUtils(){
-  while(utilG.children.length){ const c=utilG.children.pop(); c.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
+  while(utilG.children.length){ const c=utilG.children[utilG.children.length-1]; utilG.remove(c); c.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
   const gy=(E,N)=>(groundAt(E,N)-Z0)*EX;
   const cableMat=new THREE.MeshBasicMaterial({color:0xd7261e}), stormMat=new THREE.MeshBasicMaterial({color:0x8a4b14});
   const zoneMat=new THREE.MeshBasicMaterial({color:0xd7261e,transparent:true,opacity:0.16,depthWrite:false,side:THREE.DoubleSide});
@@ -737,25 +896,25 @@ function buildUtils(){
   U.cable.forEach(p=>drape(p,cableMat,0.07,true,'КЛ 2×10 кВ — за топозйомкою КБ арк. 2.1\nохоронна зона 1 м з кожного боку\nположення і глибину уточнити шурфами'));
   U.storm.forEach(p=>drape(p,stormMat,0.06,false,'Зливова каналізація — за топозйомкою\n(коричневий пунктир від дощоприймача)'));
   const inl=box(0.5,0.08,0.5,stormMat,U.inlet[0],gy(U.inlet[0],U.inlet[1])+0.04,-U.inlet[1]); info(inl,'Дощоприймач, відмітка 107,02'); utilG.add(inl);
-  const l1=label('КЛ 2×10 кВ · охоронна зона ±1 м',{px:14,bg:'rgba(215,38,30,0.92)',fg:'#fff',depthTest:false});
-  const c0=U.cable[0][Math.floor(U.cable[0].length/2)]; l1.position.set(c0[0],gy(c0[0],c0[1])+1.6,-c0[1]); utilG.add(l1);
-  const s0=U.storm[0][Math.floor(U.storm[0].length*0.35)]; const l2=label('Зливова каналізація',{px:13,bg:'rgba(138,75,20,0.92)',fg:'#fff',depthTest:false}); l2.position.set(s0[0],gy(s0[0],s0[1])+1.1,-s0[1]); utilG.add(l2);
+  const l1=tag('КЛ 2×10 кВ · охоронна зона ±1 м',{bg:'rgba(215,38,30,0.94)',fg:'#fff',line:'#d7261e',pri:6,far:130});
+  const c0=U.cable[0][Math.floor(U.cable[0].length/2)]; l1.position.set(c0[0],gy(c0[0],c0[1])+0.12,-c0[1]); utilG.add(l1);
+  const s0=U.storm[0][Math.floor(U.storm[0].length*0.35)]; const l2=tag('Зливова каналізація',{bg:'rgba(138,75,20,0.94)',fg:'#fff',line:'#8a4b14',pri:4,far:70}); l2.position.set(s0[0],gy(s0[0],s0[1])+0.1,-s0[1]); utilG.add(l2);
   // risk outlines around pits (carport frame -> world)
-  carport.updateMatrixWorld(true);
+  carport.updateMatrixWorld(true); riskG=new THREE.Group(); riskG.visible=riskOn; utilG.add(riskG);
   PIT_RISK.forEach(([ax,row,dist])=>{
     const x=AX[ax-1], z=row==='А'?0:-SPAN, g=groundRel(ax,row);
     const col=dist<1?0xd7261e:0xe08a00, h=0.8;
-    const pts=[[-h,-h],[h,-h],[h,h],[-h,h]].map(([u,v])=>carport.localToWorld(new THREE.Vector3(x+u,g*EX/EX+0.04,z+v)));
+    const pts=[[-h,-h],[h,-h],[h,h],[-h,h]].map(([u,v])=>carport.localToWorld(new THREE.Vector3(x+u,g+0.06,z+v)));
     const ln=new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts),new THREE.LineBasicMaterial({color:col})); utilG.add(ln);
-    const tag=label(dist===0?`${ax}/${row}: кабель у ямі`:`${ax}/${row}: ${nf(dist,1)} м до кабелю`,{px:13,bg:dist<1?'rgba(215,38,30,0.92)':'rgba(224,138,0,0.92)',fg:'#fff',depthTest:false});
-    const tp=carport.localToWorld(new THREE.Vector3(x,g+1.2,z+(row==='А'?1.4:-1.4))); tag.position.copy(tp); utilG.add(tag);
+    const tg=tag(`${ax}/${row} · ${dist===0?'кабель у ямі':nf(dist,1)+' м до КЛ'}`,{bg:dist<1?'rgba(215,38,30,0.94)':'rgba(224,138,0,0.94)',fg:'#fff',line:dist<1?'#d7261e':'#c77700',pri:dist===0?8:7,far:50});
+    tg.position.copy(carport.localToWorld(new THREE.Vector3(x,g+0.06,z))); riskG.add(tg);
   });
 }
 
 // ---------- step 9: trench, DC trunk, equipment room (world frame, rebuilt with exaggeration)
 const connG=G('conn'); connG.visible=false;
 function buildConn(){
-  while(connG.children.length){ const c=connG.children.pop(); c.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
+  while(connG.children.length){ const c=connG.children[connG.children.length-1]; connG.remove(c); c.traverse(o=>{ if(o.geometry) o.geometry.dispose(); }); }
   carport.updateMatrixWorld(true);
   const gy=(E,N)=>(groundAt(E,N)-Z0)*EX;
   const trenchMat=new THREE.MeshLambertMaterial({color:0x6b4a2b});
@@ -777,8 +936,8 @@ function buildConn(){
     [0.4,0.4,0.3,0x5e6b78,-1.2,0.55,-0.95,'Щит захисту АКБ 400×400×300\n2 × NH1 Battery 250 А 800 В DC']];
   eqp.forEach(([w,h,d,c,x,y,z,t])=>{ const m=box(w,h,d,new THREE.MeshLambertMaterial({color:c}),x,y,z); info(m,t); room.add(m); });
   [-0.85,0.0,0.85].forEach((x,i)=>{ const m=box(0.72,1.65,0.62,new THREE.MeshLambertMaterial({color:0xe7e9ea}),x,0.83,0.62); info(m,`Стійка АКБ №${i+1}${i===0?' + BMS (PDU)':''}\nDeye BOS-B-Pack14.3, 5 модулів\n(габарит орієнтовний)`); room.add(m); });
-  [['Прим. 2 · 8,0 м²',2.95],['Інвертор + DC/AC BOX + АКБ',3.35]].forEach(([t,h],i)=>{ const l=label(t,{px:i?14:16,depthTest:false,bg:i?'rgba(255,255,255,0.9)':'rgba(192,57,43,0.95)',fg:i?'#162026':'#fff'}); l.position.set(0,h,0); room.add(l); });
-  const lt=label(`Траншея ≈${nf(tl,0)} м (ВОР 25 м)`,{px:14,depthTest:false}); const mp=routePts[1]; lt.position.set(mp[0],gy(mp[0],mp[1])+1.2,-mp[1]); connG.add(lt);
+  const rl=tag('Прим. 2 · 8,0 м²\nІнвертор + DC/AC BOX + АКБ',{bg:'rgba(192,57,43,0.95)',fg:'#fff',line:'#c0392b',pri:8,far:120,noOcc:true}); rl.position.set(0,2.6,0); room.add(rl);
+  const lt=tag(`Траншея ≈${nf(tl,0)} м (ВОР 25 м)`,{pri:6,far:90}); const mp=routePts[1]; lt.position.set(mp[0],gy(mp[0],mp[1])+0.1,-mp[1]); connG.add(lt);
 }
 
 // ---------- assembly steps
@@ -792,7 +951,7 @@ function applyStep(){
   ['col','b2','raf','vv1','vv2','pur','plate'].forEach(k=>{ MAT[k].emissive.set(0x000000); });
   if(s===0){
     const pre=VARIANT==='pre'; on('pits',false); on('rebar',false); on('anch',!pre); on('anchP',pre); on('pitsP',false); on('pre1',false); on('truck',false); on('weld5',false); on('weld6',false); on('strings',false); connG.visible=false;
-    colorModules(false);
+    colorModules(false); asphMode('full'); riskOn=false;
     bMat.transparent=false; bMat.opacity=1; bMat.depthWrite=true; bMat.needsUpdate=true;
     ['L-frame','L-pv','L-fnd','L-route','L-brace','L-bld','L-kb'].forEach(id=>$('#'+id).dispatchEvent(new Event('change')));
     $('#stepbar').hidden=true; $('#sunread').hidden=false;
@@ -804,12 +963,14 @@ function applyStep(){
     on('pur',s>=6); on('weld6',s===6); on('pv',s>=7); on('clamp',s>=7); on('strings',s===8); connG.visible=s===9; groups.route.visible=false;
     (HL[s]||[]).forEach(k=>MAT[k].emissive.set(0x3a2a00)); if(s===4) MAT.plate.emissive.set(0x3a2a00);
     colorModules(s>=8);
-    const tr=pre?(s===2||s===3):s<=3; tMat.transparent=tr; tMat.opacity=tr?((pre?s===2:s<=2)?0.3:0.45):1; tMat.depthWrite=!tr; tMat.needsUpdate=true;
+    const tr=pre?(s===2||s===3):s<=3, holes=pre?s===2:s<=2, op=tr?(holes?0.3:0.45):1;
+    setGround(op, holes?1:Math.min(1,op+0.12)); asphMode(holes?(pre?'pre':'mono'):'full'); riskOn=holes;
     groups.kb.visible = tr ? false : $('#L-kb').checked;
     bMat.transparent = s===9; bMat.opacity = s===9?0.35:1; bMat.depthWrite = s!==9; bMat.needsUpdate=true;
     $('#stepbar').hidden=false; $('#sunread').hidden=true;
     $('#sbtxt').textContent=`Крок ${s} з 9 · ${names()[s-1]}`;
   }
+  if(riskG) riskG.visible=riskOn;
   $$('#stepchips button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.s===s)));
   renderStep(); requestRender(); updateSun();
 }
@@ -1043,10 +1204,10 @@ SG.anch.visible=VARIANT!=='pre'; SG.anchP.visible=VARIANT==='pre';
 // ---------- place everything at current exaggeration
 function placeAll(){
   setTerrainHeights();
-  carport.position.set(0,(ZERO-Z0)*EX,0);
+  carport.position.set(0,(ZERO-Z0)*EX,0); placeAsph(); placeAxes();
   bMeshes.forEach(m=>{ m.position.y=(m.userData.g-Z0)*EX; });
   spMeshes.forEach(m=>{ m.position.set(m.userData.E,(m.userData.H-Z0)*EX,-m.userData.N); m.scale.y=1.2; });
-  const ge=groundAt(eq[0],eq[1]); eqBox.position.set(eq[0],(ge-Z0)*EX+1.3,-eq[1]); eqLbl.position.set(eq[0],(ge-Z0)*EX+4.1,-eq[1]);
+  const ge=groundAt(eq[0],eq[1]); eqBox.position.set(eq[0],(ge-Z0)*EX+1.3,-eq[1]); eqLbl.position.set(eq[0],(ge-Z0)*EX+2.6,-eq[1]);
   if(routeLine){ rG.remove(routeLine); routeLine.geometry.dispose(); }
   const vs=[]; for(let q=0;q<routePts.length-1;q++){ const a=routePts[q], b=routePts[q+1]; for(let t=0;t<=1.0001;t+=0.05){ const E=a[0]+(b[0]-a[0])*t, N=a[1]+(b[1]-a[1])*t; vs.push(new THREE.Vector3(E,(groundAt(E,N)-Z0)*EX+0.08,-N)); } }
   routeLine=new THREE.Line(new THREE.BufferGeometry().setFromPoints(vs), new THREE.LineDashedMaterial({color:0xc0392b,dashSize:0.8,gapSize:0.45,linewidth:2})); routeLine.computeLineDistances(); rG.add(routeLine);
@@ -1058,7 +1219,7 @@ function placeAll(){
 function applyTheme(){
   const bg=new THREE.Color(css('--scene')||'#dce4e6'); scene.background=bg; scene.fog=new THREE.Fog(bg, 170, 420);
   const dk=isDark(); hemi.intensity=dk?0.36:0.45; bMat.color.set(dk?0x5b666b:0xcfd5d7);
-  kbMesh.material.color.set(dk?0xd8e2e6:0xffffff); colorTerrain(); requestRender();
+  kbMesh.material.color.set(dk?0xd8e2e6:0xffffff); aMat.color.set(dk?0x2f3336:ASPH_COL); asphCut.color.set(dk?0x1c1f21:0x2a2d30); colorTerrain(); requestRender();
 }
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 new MutationObserver(applyTheme).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
@@ -1122,6 +1283,7 @@ $('#play').addEventListener('click',()=>{ if(playing){ cancelAnimationFrame(play
 // ---------- layers
 function bind(id, fn){ const el=$(id); const go=()=>{ fn(el.checked); requestRender(); }; el.addEventListener('change',go); go(); }
 bind('#L-terrain', v=>{ terrain.visible=v; });
+bind('#L-asph', v=>{ asphG.visible=v; });
 bind('#L-kb', v=>{ groups.kb.visible=v; });
 bind('#L-etr', v=>{ groups.etr.visible=v; });
 bind('#L-spots', v=>{ groups.spots.visible=v; });
@@ -1129,11 +1291,12 @@ bind('#L-bld', v=>{ groups.bld.visible=v; updateSun(); });
 const exitSteps=()=>{ if(STEP){ STEP=0; applyStep(); } };
 bind('#L-frame', v=>{ exitSteps(); ['col','b2','raf','vv1','vv2','pur'].forEach(n=>SG[n].visible=v); });
 bind('#L-pv', v=>{ exitSteps(); SG.pv.visible=v; SG.clamp.visible=v; });
-bind('#L-fnd', v=>{ exitSteps(); fndG.visible=v; tMat.transparent=v; tMat.opacity=v?0.35:1; tMat.depthWrite=!v; tMat.needsUpdate=true; });
+bind('#L-fnd', v=>{ exitSteps(); fndG.visible=v; setGround(v?0.35:1, v?0.47:1); });
 bind('#L-brace', v=>{ [MAT.vv1,MAT.vv2].forEach(m=>{ m.color.set(v?0xd9822b:0x7f8a90); m.emissive.set(v?0x5a2a00:0x000000); }); });
 bind('#L-route', v=>{ groups.route.visible=v && !STEP; });
 bind('#L-axes', v=>{ axG.visible=v; });
 bind('#L-util', v=>{ utilG.visible=v; });
+bind('#L-tags', v=>{ tagsOn=v; });
 $('#ex').addEventListener('input',e=>{ EX=+e.target.value; $('#exo').textContent='×'+String(EX).replace('.',','); placeAll(); updateSun(); });
 
 // ---------- cameras
@@ -1142,7 +1305,7 @@ const gAbs=(E,N)=>(groundAt(E,N)-Z0)*EX;
 const LW=(x,y,h)=>{ const e=l2e(x,y); return W(e[0],e[1],(ZERO-Z0)*EX+h); };
 const VIEWS={
   cables:()=>[LW(43,-13,17),LW(41,6,-0.3)],
-  p1:()=>[LW(11.5,-0.8,2.7),LW(21,-6.0,0.4)], p2:()=>VIEWS.s1(), p3:()=>VIEWS.s3(),
+  p1:()=>[LW(9.0,-1.5,3.0),LW(22,-7.0,0.2)], p2:()=>VIEWS.s1(), p3:()=>VIEWS.s3(),
   s1:()=>[LW(14,-9,8),LW(8,4,-0.6)], s2:()=>[LW(9,-8,6.5),LW(4,2,-0.8)], s3:()=>[LW(7,-6.5,4.6),LW(4,2.5,-0.3)],
   s4:()=>[LW(36,-30,15),LW(26.5,-1,1.5)], s5:()=>[LW(-9,-15,10),LW(14,4,4)], s6:()=>[LW(-7,-11,16),LW(16,4,5.5)],
   s7:()=>[LW(42,-32,26),LW(26.5,3.9,4)], s8:()=>[LW(26.5,-30,60),LW(26.5,4.5,5)],
@@ -1184,13 +1347,13 @@ canvas.addEventListener('pointerleave',()=>tip.hidden=true);
 
 // ---------- render loop
 controls.addEventListener('change',requestRender);
-function resize(){ const v=$('.view'); const w=v.clientWidth, h=v.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); sizeLabels(h); requestRender(); }
+function resize(){ const v=$('.view'); const w=v.clientWidth, h=v.clientHeight; if(!w||!h) return; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); sizeOverlay(w,h); requestRender(); }
 new ResizeObserver(resize).observe($('.view'));
 const needle=$('#needle');
 function loop(){ requestAnimationFrame(loop); if(controls.update()) need=true; if(!need) return; need=false;
-  needle.style.transform=`rotate(${(controls.getAzimuthalAngle()*180/Math.PI).toFixed(1)}deg)`; renderer.render(scene,camera); }
+  needle.style.transform=`rotate(${(controls.getAzimuthalAngle()*180/Math.PI).toFixed(1)}deg)`; orientDecals(); renderer.render(scene,camera); drawTags(); }
 applyTheme(); placeAll(); updateSun(); resize(); goView('over',true); loop();
-document.fonts && document.fonts.ready.then(()=>requestRender());
+document.fonts && document.fonts.ready.then(()=>{ DECALS.forEach(paintDecal); TAGS.forEach(a=>a.userData.tag.w=0); requestRender(); });
 $('#loading').remove();
 })();
 </script>
