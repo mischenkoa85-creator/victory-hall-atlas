@@ -154,7 +154,10 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
   .side{border-left:0;border-top:1px solid var(--rule)}
   .pane{overflow:visible}
   .bar .code{margin-left:0}
+  .tabs{position:sticky;top:0;z-index:6;background:var(--panel)}
 }
+.tomodel{position:fixed;right:14px;bottom:calc(14px + env(safe-area-inset-bottom));z-index:30;background:var(--cobalt);color:var(--panel);border:0;border-radius:20px;padding:9px 15px;font-size:13.5px;font-weight:500;box-shadow:0 2px 10px rgba(0,0,0,.25);cursor:pointer}
+.bar a.mlink{font-size:12.5px;color:var(--cobalt);text-decoration:none;border:1px solid var(--rule);border-radius:3px;padding:3px 8px}
 @media (prefers-reduced-motion: reduce){.compass svg{transition:none}}
 </style>
 </head>
@@ -164,6 +167,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
     <h1>СЕС-навіс з УЗЕ · Гостомель</h1>
     <span class="addr">вул. Свято-Покровська, 81Б · Будинок культури · паркувальний майданчик</span>
     <span class="code">РП 36/26 · КБ / ЕТР · 2026</span>
+    <a class="mlink" href="model.html">Лише модель ↗</a>
   </header>
 
   <section class="view" aria-label="3D-макет">
@@ -298,6 +302,7 @@ summary{cursor:pointer;font-weight:600;font-size:13px;padding:4px 0}
       <p class="foot">Відмітки топооснови: ряд стоянки 106,94–107,60 м; вулиця Свято-Покровська 108,25–109,35 м. На ситуаційному плані т.3 ті самі місця мають 181,2–186,0 м — інша система висот.</p>
     </div>
   </aside>
+  <button class="tomodel" id="tomodel" hidden>↑ Модель</button>
 </div>
 
 <script>window.addEventListener("error",function(e){var l=document.getElementById("loading");if(l)l.textContent="Макет не відкрився: "+(e.message||"помилка")+(e.lineno?" (рядок "+e.lineno+")":"");});</script>
@@ -2030,7 +2035,7 @@ function applyStep(){
   $$('#stepchips button').forEach(b=>b.setAttribute('aria-pressed', String(+b.dataset.s===s)));
   renderStep(); requestRender(); updateSun();
 }
-function setStep(s, cam){ STEP=Math.max(0,Math.min(9,s)); applyStep(); if(cam!==false) goView(STEP?((VARIANT==='pre'&&STEP<=3)?'p'+STEP:'s'+STEP):'over'); }
+function setStep(s, cam){ STEP=Math.max(0,Math.min(9,s)); applyStep(); writeHash(); if(cam!==false) goView(STEP?((VARIANT==='pre'&&STEP<=3)?'p'+STEP:'s'+STEP):'over'); }
 
 // ---------- step panels (numbers come from Q)
 const TB=(head,rows,cls)=>`<div class="tw"><table class="spec ${cls||''}"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map((c,i)=>`<td${typeof c==='number'||/^[\d\s,.−+×/%–]+$/.test(String(c))?' class="n"':''}>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
@@ -2254,6 +2259,7 @@ $('#sbnext').addEventListener('click',()=>setStep(Math.min(9,STEP+1)));
 $('#sbexit').addEventListener('click',()=>setStep(0));
 $('#t-build').addEventListener('click',()=>{ if(!STEP) setStep(1); });
 renderStep();
+function writeHash(){ try{ const h=STEP?`#step=${STEP}${VARIANT==='mono'?'&v=mono':''}`:''; if(h!==location.hash&&(h||/^#step/.test(location.hash))) history.replaceState(null,'',h||location.pathname+location.search); }catch(e){} }
 
 ['pits','rebar','truck','weld5','weld6','strings','pitsP','pre1','pbase'].forEach(n=>SG[n].visible=false);
 SG.anch.visible=VARIANT!=='pre'; SG.anchP.visible=VARIANT==='pre';
@@ -2419,6 +2425,21 @@ const needle=$('#needle');
 function loop(){ requestAnimationFrame(loop); if(controls.update()) need=true; if(!need) return; need=false;
   needle.style.transform=`rotate(${(controls.getAzimuthalAngle()*180/Math.PI).toFixed(1)}deg)`; orientDecals(); renderer.render(scene,camera); drawTags(); }
 applyTheme(); placeAll(); updateSun(); resize(); goView('over',true); loop();
+// ---------- links into the page: #build, #find, #sun, #data, #step=3, #step=2&v=mono, #view=plan
+function readHash(){ const tabs=['model','build','sun','find','data']; let step=null, v=null, tab=null, view=null;
+  location.hash.slice(1).split('&').forEach(t=>{ const [k,val]=t.split('='); if(!k) return;
+    if(val===undefined){ if(tabs.includes(k)) tab=k; else if(VIEWS[k]) view=k; }
+    else if(k==='step') step=+val; else if(k==='v'&&(val==='pre'||val==='mono')) v=val; else if(k==='view'&&VIEWS[val]) view=val; else if(k==='tab'&&tabs.includes(val)) tab=val; });
+  if(v&&v!==VARIANT) setVariant(v);
+  if(step!==null&&step>=0&&step<=9){ $('#t-build').click(); setStep(step); }
+  else if(tab){ $(`.tabs [data-tab="${tab}"]`).click(); }
+  if(view) goView(view); }
+if(location.hash) readHash();
+window.addEventListener('hashchange',readHash);
+// ---------- phone: «↑ Модель» when the 3D view has scrolled away
+if('IntersectionObserver' in window){ const tm=$('#tomodel'), narrow=matchMedia('(max-width: 860px)');
+  new IntersectionObserver(es=>{ tm.hidden=!(narrow.matches&&!es[0].isIntersecting); },{threshold:0.12}).observe($('.view'));
+  tm.addEventListener('click',()=>$('.view').scrollIntoView({behavior:'smooth',block:'start'})); }
 document.fonts && document.fonts.ready.then(()=>{ DECALS.forEach(paintDecal); TAGS.forEach(a=>a.userData.tag.w=0); requestRender(); });
 $('#loading').remove();
 })();
