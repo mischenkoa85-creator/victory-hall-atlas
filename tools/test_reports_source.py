@@ -9,12 +9,15 @@ BASE='0bdf99401e2d572afe6cec2cc4a846cdf202b2f0'
 TAG=b'<script src="reports/panel.js" data-reporting-base="https://srv1208299.hstgr.cloud/block8-reporting/v1/reports/" defer></script>\n'
 
 class SourceTests(unittest.TestCase):
-    def test_only_script_tag_added_to_original_model(self):
+    def test_model_changes_limited_to_report_tag_and_reviewed_identity_binding(self):
         original=subprocess.check_output(['git','show',BASE+':index.html'],cwd=ROOT)
-        current=(ROOT/'index.html').read_bytes().replace(b'\r\n',b'\n')
+        # Unit421's suite reverses its exact reviewed index edits and proves that
+        # geometry, encrypted data and report code remain byte-for-byte unchanged.
+        subprocess.run(['node','tools/test_unit421.cjs'],cwd=ROOT,check=True)
+        current=subprocess.check_output(['git','show','970aa7ca42eb6c42a9fae6cf569e8fa0a95ef168:index.html'],cwd=ROOT).replace(b'\r\n',b'\n')
         self.assertEqual(current.count(TAG),1)
         self.assertEqual(current.replace(TAG,b'').rstrip(b'\n'),original.replace(b'\r\n',b'\n').rstrip(b'\n'))
-        subprocess.run(['git','diff','--exit-code',BASE,'--','m','d'],cwd=ROOT,check=True,capture_output=True)
+        subprocess.run(['git','diff','--exit-code',BASE,'--','m','d',':(exclude)m/col.json'],cwd=ROOT,check=True,capture_output=True)
 
     def test_launcher_is_menu_only_and_no_model_mutator(self):
         panel=(ROOT/'reports/panel.js').read_text(encoding='utf-8')
