@@ -44,10 +44,13 @@
       <header><div><h1 id="vh-title">Розрахунки Victory Hall</h1><p>Електрика та матеріали про відсутність світла.</p></div><button class="close" type="button" aria-label="Закрити розрахунки">×</button></header>
       <main>
         <div class="badge">Пробна версія · тільки перегляд</div>
+        <nav class="views" aria-label="Сервіс звітів"><button id="service-python" class="secondary" type="button" aria-pressed="true" aria-controls="python-service">Сервер · Python / SQL</button><button id="service-apps" class="secondary" type="button" aria-pressed="false" aria-controls="apps-service">Google Apps Script</button></nav>
+        <section id="python-service" aria-label="Звіти Python / SQL">
+        <p class="muted">Сервер: srv1208299.hstgr.cloud · звіти всередині моделі, дані з SQL.</p>
         <nav class="views" aria-label="Розділи будинку"><button id="view-reports" class="secondary" type="button" aria-pressed="true">Електрика</button><button id="view-outages" class="secondary" type="button" aria-pressed="false">Коли не було світла</button></nav>
         <p id="selection" class="context">Об’єкт звіту: весь будинок — ТП-2686.</p>
         <section class="card" id="access-card"><h2>Доступ до звітів</h2><p class="muted">Вставте своє персональне посилання на «Victory Hall — звіти». Це окремий доступ до звітів; ключ атласу сюди не підходить.</p>
-          <form id="access-form"><label for="access-link">Персональне посилання<input id="access-link" type="password" autocomplete="off" spellcheck="false" required placeholder="Вставте посилання, видане вам"></label><div class="actions"><button class="primary" type="submit">Підключити звіти</button><a href="https://script.google.com/macros/s/AKfycbzpyWSeNKddx1xvzCqEr2w6ew4p5EMkFzof3uwLrFJBb0GBd2DD4s1ivsB9LHyr8fra/exec" target="_blank" rel="noopener noreferrer">Відкрити наявні звіти</a></div></form>
+          <form id="access-form"><label for="access-link">Персональне посилання<input id="access-link" type="password" autocomplete="off" spellcheck="false" required placeholder="Вставте посилання, видане вам"></label><div class="actions"><button class="primary" type="submit">Підключити звіти</button></div></form>
           <p class="muted">Доступ зберігається лише до закриття або перезавантаження цієї вкладки.</p>
         </section>
         <section class="card" id="report-controls"><form id="report-form"><div class="row"><label>Звіт<select id="report-type"><option value="TP2686_MONTH">Будинок · електрика · ТП-2686</option></select></label><label>Місяць<select id="month" disabled><option value="">Спочатку підключіть звіти</option></select></label></div><div class="actions"><button id="calculate" class="primary" type="submit" disabled>Розрахувати</button></div></form></section>
@@ -58,6 +61,14 @@
         <button id="disconnect" class="secondary" type="button" hidden>Від’єднати доступ</button>
         <p id="status" class="status" role="status" aria-live="polite"></p>
         <section id="results" hidden></section>
+        </section>
+        <section id="apps-service" class="card" aria-label="Звіти Google Apps Script" hidden>
+          <h2>Google Apps Script · наявні звіти</h2>
+          <p>Окремий сервіс відкриється в новій вкладці. Модель залишиться тут; для повернення перейдіть назад у цю вкладку.</p>
+          <p><a id="apps-open" href="https://script.google.com/macros/s/AKfycbzpyWSeNKddx1xvzCqEr2w6ew4p5EMkFzof3uwLrFJBb0GBd2DD4s1ivsB9LHyr8fra/exec" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer">Відкрити звіти Google Apps Script ↗</a></p>
+          <p class="muted">Цей сервіс має власний доступ. Ключ моделі й персональне посилання Python-сервісу сюди не передаються.</p>
+          <p class="notice">Джерела та розрахунки двох сервісів ще не звірені між собою. Автоматичного перемикання чи об’єднання результатів немає.</p>
+        </section>
       </main>
     </dialog>`;
   document.body.appendChild(host);
@@ -72,7 +83,7 @@
   menu.append(menuTitle,launch); menuMount.prepend(menu);
   const $ = id => root.getElementById(id);
   const dialog = root.querySelector('dialog');
-  let token = '', currentRequest = null, sequence = 0, activeView = 'reports', outageData = null;
+  let token = '', currentRequest = null, sequence = 0, activeView = 'reports', activeService = 'python', outageData = null;
   const setStatus = (text, error = false) => { $('status').textContent = text; $('status').classList.toggle('error', error); };
   const cancel = () => { sequence++; currentRequest?.abort(); currentRequest = null; };
   const reset = () => {
@@ -99,8 +110,8 @@
     if (!dialog.open) dialog.showModal();
     launch.setAttribute('aria-expanded','true');
     // A closed panel may have cancelled its initial load. Retry only that load.
-    if (token && activeView === 'outages' && !outageData) loadOutages();
-    else if (token && activeView === 'reports' && !$('month').value) loadPeriods();
+    if (activeService === 'python' && token && activeView === 'outages' && !outageData) loadOutages();
+    else if (activeService === 'python' && token && activeView === 'reports' && !$('month').value) loadPeriods();
   };
   launch.setAttribute('aria-expanded','false');
   launch.addEventListener('click', openPanel);
@@ -122,6 +133,7 @@
   });
   $('disconnect').addEventListener('click', () => { reset(); closePanel(); });
   const setView = view => {
+    if (activeService !== 'python') return;
     cancel(); activeView = view; setStatus('');
     $('view-reports').setAttribute('aria-pressed', String(view === 'reports'));
     $('view-outages').setAttribute('aria-pressed', String(view === 'outages'));
@@ -133,6 +145,20 @@
   };
   $('view-reports').addEventListener('click', () => setView('reports'));
   $('view-outages').addEventListener('click', () => setView('outages'));
+
+  const setService = service => {
+    if (!['python', 'apps'].includes(service) || service === activeService) return;
+    cancel(); activeService = service; setStatus(''); $('access-link').value = '';
+    $('service-python').setAttribute('aria-pressed', String(service === 'python'));
+    $('service-apps').setAttribute('aria-pressed', String(service === 'apps'));
+    $('python-service').hidden = service !== 'python';
+    $('apps-service').hidden = service !== 'apps';
+    // Keep an accepted Python credential in memory only. Never attach it to
+    // the separate Apps Script URL. Only an explicit link click opens Google.
+    if (service === 'python') setView(activeView);
+  };
+  $('service-python').addEventListener('click', () => setService('python'));
+  $('service-apps').addEventListener('click', () => setService('apps'));
 
   async function api(route, body, signal, credential) {
     if (!endpoint) throw new Error('Адресу служби звітів не налаштовано. Дані доступу не надсилалися.');
@@ -148,6 +174,7 @@
     return data;
   }
   async function connectAccess(value) {
+    if (activeService !== 'python') return;
     resetResults(); cancel(); $('access-link').value = '';
     let credential;
     try {
@@ -177,6 +204,7 @@
   function node(tag, text, cls) { const n = document.createElement(tag); n.textContent = text; if(cls) n.className = cls; return n; }
   const monthLabel = month => new Intl.DateTimeFormat('uk-UA', {year:'numeric',month:'long',timeZone:'UTC'}).format(new Date(month+'-01T00:00:00Z'));
   async function loadPeriods() {
+    if (activeService !== 'python') return;
     cancel(); const id = sequence, controller = new AbortController(); currentRequest = controller;
     const timeout = setTimeout(() => controller.abort(), 30000);
     try {
@@ -191,6 +219,7 @@
     finally {clearTimeout(timeout);}
   }
   async function loadOutages() {
+    if (activeService !== 'python') return;
     cancel(); const id = sequence, controller = new AbortController(); currentRequest = controller;
     const timeout = setTimeout(() => controller.abort(), 30000);
     const previousMonth = $('outage-month').value;
@@ -299,7 +328,7 @@
   }
   $('report-form').addEventListener('submit', async event => {
     event.preventDefault(); const month = $('month').value;
-    if (!token || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return;
+    if (activeService !== 'python' || !token || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return;
     cancel();resetResults();const id=sequence, controller=new AbortController();currentRequest=controller;
     const timeout=setTimeout(()=>controller.abort(),180000);$('calculate').disabled=true;$('month').disabled=true;
     setStatus('Формую звіт за вибраний місяць…');
