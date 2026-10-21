@@ -7913,7 +7913,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       setTimeout(sync, 400);
     });
     setInterval(sync, 600);
-    window.P00.ui = { top: function () { var t = top(true); return t ? t.name : null; }, closeTop: function () { var t = top(true); if (t) { t.close(); return t.name; } return null; } };
+    window.P00.ui = { register: function (it) { items.unshift(it); }, top: function () { var t = top(true); return t ? t.name : null; }, closeTop: function () { var t = top(true); if (t) { t.close(); return t.name; } return null; } };
   });
 })();
 </script>
@@ -8022,6 +8022,156 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     }
     A.fn.vis();
     window.P00.speed = { hidden: function () { var n = 0; Object.keys(A.chunks).forEach(function (k) { A.chunks[k].blocks.forEach(function (b) { if (NETS[b.userData.g] && !b.visible) n++; }); }); return n; }, warmed: function () { return Object.keys(warmed); }, cached: function () { return Object.keys(A.chunks); } };
+  });
+})();
+</script>
+<script>
+/* Атлас: живлення будинку (крок 5, 21.10.2026) — віконце «блискавка і сонце», видно всім.
+   Мережа: є / «Відсутня мережа» з часом без мережі / «Немає даних» (сіре — коли дані не надходять: це не те саме, що вимкнення світла).
+   Сонце: генерація є — сонце мʼяко блимає і кВт; вдень мало генерації — сонце за хмаркою; ніч — маленький місяць (день чи ніч — з розрахунку Сонця на сторінці).
+   Дані — з адреси стану на сервері (POWER_URL), коли її підключать; паролів і ключів Deye на сторінці немає.
+   Поки адреси немає, віконце чесно показує «Немає даних». Показ станів для перевірки: ?power=demo.
+   Налаштування (показувати віконце, цифри, блимання) зберігаються лише на цьому пристрої. */
+(function () {
+  'use strict';
+  var POWER_URL = null;          // напр. 'https://srv1208299.hstgr.cloud/block8-reporting/v1/energy/status' — коли адміністратор VPS її відкриє
+  var POLL_MS = 10000;           // як часто питати стан, поки сторінка на екрані
+  var STALE_MS = 60000;          // дані старші — «Немає даних»
+  var GEN_KW = 0.3;              // поріг «генерація є», кВт (уточнити за справжніми даними; станція 42,3 кВт)
+  var LS = 'atlas-power-v1';
+  function ready(fn) { if (window.P00 && window.P00.ready && window.__A3 && window.P00.ui && document.getElementById('skypill')) fn(); else setTimeout(function () { ready(fn); }, 250); }
+  ready(function () {
+    var $ = function (id) { return document.getElementById(id); };
+    var opts = { show: true, nums: true, blink: true };
+    try { var o = JSON.parse(localStorage.getItem(LS) || 'null'); if (o) Object.keys(opts).forEach(function (k) { if (typeof o[k] === 'boolean') opts[k] = o[k]; }); } catch (e) {}
+    var save = function () { try { localStorage.setItem(LS, JSON.stringify(opts)); } catch (e) {} };
+
+    var css = document.createElement('style');
+    css.textContent =
+      '#powerpill{position:fixed;left:12px;z-index:4;display:flex;align-items:center;gap:10px;min-height:38px;padding:0 12px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:19px;box-shadow:0 1px 6px rgba(0,0,0,.12);font-size:13px;font-weight:650;white-space:nowrap;cursor:pointer}' +
+      '#powerpill[hidden],#powerpanel[hidden]{display:none}body.boot #powerpill{display:none}' +
+      '#powerpill .it{display:flex;align-items:center;gap:5px}#powerpill small{font-weight:500;color:var(--ink2)}' +
+      '#powerpill.off .g{color:#c8332d}#powerpill.unk .g{color:var(--ink2)}' +
+      '#powerpill .blink{animation:pwrblink 2.4s ease-in-out infinite}@keyframes pwrblink{0%,100%{opacity:1}50%{opacity:.45}}' +
+      '@media (prefers-reduced-motion:reduce){#powerpill .blink{animation:none}}' +
+      '#powerpanel{position:fixed;left:10px;right:10px;top:calc(var(--safe-t, 0px) + 62px);z-index:9;background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:var(--r, 16px);box-shadow:var(--shadow);padding:12px 14px;max-width:400px;font-size:14px;font-variant-numeric:tabular-nums}' +
+      '@media (min-width:900px){#powerpanel{left:16px;right:auto;width:380px;top:76px}}' +
+      '#powerpanel .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}#powerpanel .hd b{font-size:16px;font-weight:750}' +
+      '#powerpanel .x{flex:0 0 auto;width:40px;height:40px;border-radius:20px;border:1px solid var(--line);background:var(--panel2);color:var(--ink);font-size:17px;cursor:pointer}' +
+      '#powerpanel dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:8px 0}#powerpanel dt{color:var(--ink2)}#powerpanel dd{margin:0}' +
+      '#powerpanel .set{border-top:1px solid var(--line);margin-top:8px;padding-top:8px;display:flex;flex-direction:column;gap:6px}#powerpanel label{display:flex;gap:8px;align-items:center}' +
+      '#powerpanel .muted{color:var(--ink2);font-size:12.5px;margin:6px 0 0}';
+    document.head.appendChild(css);
+
+    var I = {
+      bolt: function (c) { return '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="' + c + '"/></svg>'; },
+      boltOff: '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2 4 14h6l-1 8 9-12h-6z" fill="#c8332d"/><path d="M3 3l18 18" stroke="var(--panel)" stroke-width="4" stroke-linecap="round"/><path d="M3 3l18 18" stroke="#c8332d" stroke-width="2.2" stroke-linecap="round"/></svg>',
+      sun: function (c) { return '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="5" fill="' + c + '"/><g stroke="' + c + '" stroke-width="2" stroke-linecap="round"><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></g></svg>'; },
+      cloud: '<svg width="22" height="20" viewBox="0 0 26 24" aria-hidden="true"><circle cx="9" cy="9" r="4.5" fill="#f2b705"/><g stroke="#f2b705" stroke-width="1.8" stroke-linecap="round"><path d="M9 1.5v2M1.5 9h2M3.7 3.7l1.4 1.4M14.3 3.7l-1.4 1.4"/></g><path d="M8 20h12a4 4 0 0 0 0-8 5.5 5.5 0 0 0-10.4 1.6A3.3 3.3 0 0 0 8 20z" fill="#d7dde6" stroke="#9aa4b4" stroke-width="1"/></svg>',
+      moon: '<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z" fill="#8f9bb3"/></svg>'
+    };
+    var pill = document.createElement('button'); pill.type = 'button'; pill.id = 'powerpill'; pill.setAttribute('aria-label', 'Живлення будинку');
+    var panel = document.createElement('section'); panel.id = 'powerpanel'; panel.hidden = true; panel.setAttribute('aria-label', 'Живлення будинку');
+    var sky = $('skypill'); sky.parentNode.insertBefore(pill, sky.nextSibling); document.body.appendChild(panel);
+
+    /* стан */
+    var S = { grid: 'unknown', since: null, kw: null, today: null, soc: null, outages: null, updated: null, source: POWER_URL ? 'server' : 'none' };
+    var fmtT = function (t) { var d = new Date(t); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
+    var dur = function (ms) { var m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? m + ' хв' : Math.floor(m / 60) + ' год ' + (m % 60) + ' хв'; };
+    var num = function (x, d) { return x == null ? '—' : (+x).toFixed(d).replace('.', ','); };
+    function day() { try { var st = window.P00.sky && window.P00.sky.state && window.P00.sky.state(); var a = st && (st.sun ? st.sun.alt : st.sunAlt); if (typeof a === 'number') return a > -2; } catch (e) {} var h = new Date().getHours(); return h >= 7 && h < 19; }
+    function view() {
+      var stale = !S.updated || Date.now() - S.updated > STALE_MS;
+      var grid = stale ? 'unknown' : S.grid;
+      var pv = stale || S.kw == null ? 'unknown' : (S.kw >= GEN_KW ? 'gen' : (day() ? 'cloud' : 'night'));
+      if (!stale && pv === 'unknown' && !day()) pv = 'night';
+      return { grid: grid, pv: pv, stale: stale };
+    }
+    function render() {
+      var v = view();
+      pill.hidden = !opts.show;
+      pill.className = v.grid === 'off' ? 'off' : v.grid === 'unknown' ? 'unk' : '';
+      var g = v.grid === 'on' ? '<span class="it g">' + I.bolt('#e2a400') + 'Мережа є</span>'
+        : v.grid === 'off' ? '<span class="it g">' + I.boltOff + 'Відсутня мережа' + (S.since ? ' <small>' + dur(Date.now() - S.since) + '</small>' : '') + '</span>'
+        : '<span class="it g">' + I.bolt('#b5bcc8') + 'Немає даних' + (S.updated ? ' <small>з ' + fmtT(S.updated) + '</small>' : '') + '</span>';
+      var p = '';
+      if (v.pv === 'gen') p = '<span class="it"><span class="' + (opts.blink ? 'blink' : '') + '">' + I.sun('#f2b705') + '</span>' + (opts.nums ? num(S.kw, 1) + ' кВт' : '') + '</span>';
+      else if (v.pv === 'cloud') p = '<span class="it">' + I.cloud + (opts.nums && S.kw != null ? num(S.kw, 1) + ' кВт' : '') + '</span>';
+      else if (v.pv === 'night') p = '<span class="it">' + I.moon + '<small>ніч</small></span>';
+      pill.innerHTML = g + p;
+      pill.setAttribute('aria-label', 'Живлення будинку: ' + pill.textContent.trim());
+      if (!panel.hidden) renderPanel(v);
+      place();
+    }
+    function renderPanel(v) {
+      v = v || view();
+      var gridTxt = v.grid === 'on' ? 'є' + (S.since ? ' з ' + fmtT(S.since) : '') : v.grid === 'off' ? 'відсутня' + (S.since ? ' з ' + fmtT(S.since) + ' (' + dur(Date.now() - S.since) + ')' : '') : 'немає даних';
+      var pvTxt = v.pv === 'gen' ? num(S.kw, 1) + ' кВт' : v.pv === 'cloud' ? 'мало сонця' + (S.kw != null ? ', ' + num(S.kw, 1) + ' кВт' : '') : v.pv === 'night' ? 'ніч' : 'немає даних';
+      panel.innerHTML = '<div class="hd"><div><b>Живлення будинку</b><div class="muted" style="margin:2px 0 0">СЕС 42,3 кВт · накопичувач 60 кВт·год</div></div><button type="button" class="x" id="powerx" aria-label="Закрити">✕</button></div>' +
+        '<dl><dt>Мережа</dt><dd>' + gridTxt + '</dd><dt>Сонце</dt><dd>' + pvTxt + '</dd>' +
+        (S.today != null ? '<dt>Сьогодні</dt><dd>' + num(S.today, 0) + ' кВт·год</dd>' : '') +
+        (S.soc != null ? '<dt>Батарея</dt><dd>' + Math.round(S.soc) + ' %</dd>' : '') +
+        (S.outages != null ? '<dt>Вимкнень сьогодні</dt><dd>' + S.outages + '</dd>' : '') +
+        '<dt>Оновлено</dt><dd>' + (S.updated ? fmtT(S.updated) : '—') + '</dd></dl>' +
+        (S.source === 'none' ? '<p class="muted">Дані з інвертора ще не підключено. Коли сервер почне їх приймати, тут буде стан мережі й сонця: зникнення мережі — протягом 30 секунд, решта — підсумками кожні 5 хвилин.</p>' : '') +
+        (S.source === 'demo' ? '<p class="muted">Показ станів для перевірки — не справжні дані.</p>' : '') +
+        '<div class="set"><label><input type="checkbox" data-o="show"' + (opts.show ? ' checked' : '') + '> показувати віконце на екрані</label>' +
+        '<label><input type="checkbox" data-o="nums"' + (opts.nums ? ' checked' : '') + '> показувати кВт</label>' +
+        '<label><input type="checkbox" data-o="blink"' + (opts.blink ? ' checked' : '') + '> сонце блимає, коли є генерація</label></div>';
+      $('powerx').onclick = closePanel;
+    }
+    function openPanel() { panel.hidden = false; renderPanel(); }
+    function closePanel() { panel.hidden = true; }
+    pill.addEventListener('click', function () { if (panel.hidden) openPanel(); else closePanel(); });
+    panel.addEventListener('change', function (e) { var k = e.target.getAttribute && e.target.getAttribute('data-o'); if (!k) return; opts[k] = !!e.target.checked; save(); render(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !panel.hidden) { e.stopPropagation(); closePanel(); } });
+    if (window.P00.ui && window.P00.ui.register) window.P00.ui.register({ name: 'power', open: function () { return !panel.hidden; }, close: closePanel });
+    /* якщо віконце сховано — повернути його можна з інженерного меню */
+    var eb = $('engbody');
+    if (eb) { var d = document.createElement('div'); d.innerHTML = '<h2>Живлення будинку</h2><div class="grid"><button type="button" id="powershow" style="grid-column:span 2">Віконце «Мережа і сонце»</button></div>'; eb.appendChild(d); $('powershow').onclick = function () { opts.show = true; save(); render(); var x = $('engx'); if (x) x.click(); openPanel(); }; }
+
+    /* місце: під карткою дати й перемикачем «Повна модель» (телефон) або праворуч від них (компʼютер) */
+    function place() {
+      if (pill.hidden) return;
+      var s = $('skypill'), l = $('lvlpill');
+      var rs = s && !s.hidden ? s.getBoundingClientRect() : null, rl = l && !l.hidden && getComputedStyle(l).display !== 'none' ? l.getBoundingClientRect() : null;
+      if (rs && !rs.height) rs = null; if (rl && !rl.height) rl = null;
+      if (window.innerWidth >= 900) { var an = rl || rs; pill.style.left = Math.round(an ? an.right + 10 : 12) + 'px'; pill.style.top = Math.round(an ? an.top + (an.height - 38) / 2 : 60) + 'px'; }
+      else { var b = rl || rs; pill.style.left = Math.round(rs ? rs.left : 12) + 'px'; pill.style.top = Math.round(b ? b.bottom + 8 : 180) + 'px'; }
+    }
+    window.addEventListener('resize', place);
+
+    /* дані */
+    function apply(j, src) {
+      if (!j) return;
+      S.grid = j.grid && /^(on|off)$/.test(j.grid.state) ? j.grid.state : 'unknown';
+      S.since = j.grid && j.grid.since ? Date.parse(j.grid.since) || null : null;
+      S.kw = j.pv && typeof j.pv.kw === 'number' ? j.pv.kw : null;
+      S.today = j.pv && typeof j.pv.today_kwh === 'number' ? j.pv.today_kwh : null;
+      S.soc = j.battery && typeof j.battery.soc === 'number' ? j.battery.soc : null;
+      S.outages = j.grid && typeof j.grid.outages_today === 'number' ? j.grid.outages_today : null;
+      S.updated = j.updated ? Date.parse(j.updated) || Date.now() : Date.now();
+      S.source = src; render();
+    }
+    function poll() {
+      if (!POWER_URL || document.hidden) return;
+      fetch(POWER_URL, { credentials: 'omit', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { apply(j, 'server'); }).catch(function () { render(); });
+    }
+    var DEMO = {
+      on: { grid: { state: 'on', since: new Date(Date.now() - 3 * 3600e3).toISOString(), outages_today: 2 }, pv: { kw: 18.6, today_kwh: 96 }, battery: { soc: 74 } },
+      off: { grid: { state: 'off', since: new Date(Date.now() - 42 * 60e3).toISOString(), outages_today: 3 }, pv: { kw: 9.1, today_kwh: 61 }, battery: { soc: 58 } },
+      cloud: { grid: { state: 'on' }, pv: { kw: 0.2, today_kwh: 12 }, battery: { soc: 81 } },
+      night: { grid: { state: 'on' }, pv: { kw: 0 }, battery: { soc: 66 } }
+    };
+    window.P00.power = {
+      state: function () { var v = view(); return { grid: v.grid, pv: v.pv, kw: S.kw, since: S.since, updated: S.updated, source: S.source, show: opts.show }; },
+      demo: function (k) { S.forceNight = k === 'night'; var d = DEMO[k]; if (!d) { S.updated = null; S.source = 'demo'; render(); return; } var j = JSON.parse(JSON.stringify(d)); j.updated = new Date().toISOString(); apply(j, 'demo'); },
+      open: openPanel, close: closePanel
+    };
+    var dayOrig = day; day = function () { return S.forceNight ? false : dayOrig(); };
+    if (/[?&]power=demo\b/.test(location.search)) { var seq = ['on', 'cloud', 'off', 'night', 'none'], i = 0; S.source = 'demo'; (function cycle() { window.P00.power.demo(seq[i % seq.length]); i++; setTimeout(cycle, 6000); })(); }
+    render(); poll(); setInterval(poll, POLL_MS); setInterval(render, 15000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
   });
 })();
 </script>
