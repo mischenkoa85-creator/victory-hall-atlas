@@ -2,7 +2,8 @@
 const fs = require('node:fs'), path = require('node:path'), zlib = require('node:zlib');
 const vm = require('node:vm'), assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const root = path.join(__dirname, '..'), base = '970aa7ca42eb6c42a9fae6cf569e8fa0a95ef168';
+// Base: VPS public baseline 2026-10-21 (manifest: handoff/model-editing-20261021); the unit 421 edits are re-applied on top of it.
+const root = path.join(__dirname, '..'), base = '47f1d953edd5fb72edb2125dcbdd9650e472a937';
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const source = fs.readFileSync(path.join(root, 'model-bindings/unit421.js'), 'utf8');
 const original = execFileSync('git', ['show', base+':index.html'], {cwd:root,encoding:'utf8'}).replace(/\r\n/g, '\n');
