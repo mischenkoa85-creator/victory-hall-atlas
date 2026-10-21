@@ -1,5 +1,7 @@
-// Reconciliation guard: VPS public baseline of 2026-10-21 + the reviewed unit 421 integration, nothing else.
-// History-independent: compares against SHA-256 values in handoff/model-editing-20261021/BASELINE_MANIFEST.json.
+// Model data guard: VPS public baseline of 2026-10-21 + the reviewed unit 421 key, nothing else in the model data.
+// History-independent: compares against SHA-256 values in handoff/model-editing-20261021/BASELINE_MANIFEST.json
+// and against fingerprints of the baseline's embedded data blocks (object table ck-core, building summary bdata).
+// Interface code in index.html may change in later reviewed PRs; it is covered by the browser checks, not here.
 // Run: node tools/test_model_baseline.cjs
 const fs = require('node:fs'), path = require('node:path'), zlib = require('node:zlib');
 const crypto = require('node:crypto'), assert = require('node:assert/strict');
@@ -9,41 +11,31 @@ const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 const read = p => fs.readFileSync(path.join(root, p));
 const files = manifest.files;
 assert.equal(Object.keys(files).length, 51);
+// Embedded data blocks of the baseline index.html (sha256 of the decoded ck-core JSON bytes and of the bdata JSON text).
+const BASE_CORE = 'eab704f59d54d12903a9fa057d775d11277b70bb4d441e5173e47bdc33247538';
+const BASE_BDATA = 'cac6964c1e482d50efddb71517d1ff1b894da5f989d608676530272ec3ae2975';
+// Reports panel: owner decision 21.10.2026 — github.io keeps the panel from main (personal report links);
+// the VPS panel (manifest hash) stays on the VPS deployment only.
+const GITHUB_PANEL = '3e805de487fb956431d1b520205d8aeea67437a5c9856a30d2aa4151790c7c20';
 
-// 1. Every public baseline file except the two integration points is byte-identical (chunks, public d/*.json, reports/panel.js).
+// 1. Model chunks and public floor data are byte-identical to the VPS baseline.
 for (const [p, f] of Object.entries(files)) {
-  if (p === 'index.html' || p === 'm/col.json') continue;
+  if (p === 'index.html' || p === 'm/col.json' || p === 'reports/panel.js') continue;
   assert.equal(sha(read(p)), f.sha256, 'changed baseline file: ' + p);
 }
-
-// 2. index.html = baseline + exactly the unit 421 integration. Reverse it byte-exactly and compare hashes.
-const html = read('index.html').toString('utf8');
-let base = html;
-const cut = (from, to) => { assert.equal(base.split(from).length, 2, 'expected once: ' + from.slice(0, 60)); base = base.replace(from, to); };
-cut('<script src="model-bindings/unit421.js"></script>\n', '');
-const tagged = base.match(/^.*\/\/ UNIT421[^\n]*\n/gm) || [];
-assert.equal(tagged.length, 3); base = base.replace(/^.*\/\/ UNIT421[^\n]*\n/gm, '');
-base = base.replace(/    \/\* UNIT421 START: preserve source snapshot,[\s\S]*?    \/\* UNIT421 END \*\/\n/, () =>
-  "    if (B.not_in_model.length) h += '<p class=\"note\">У ДАХ є, а в моделі немає: ' + B.not_in_model.map(function (k) { return TL[k.split(':')[0]].sh + ' ' + k.split(':')[1]; }).join(', ') + '.</p>';\n");
-const blocks = base.match(/^([ \t]*)\/\* UNIT421 START:[\s\S]*?\1\/\* UNIT421 END \*\/\n/gm) || [];
-assert.equal(blocks.length, 3);
-base = base.replace(/^  \/\* UNIT421 START: existing room link;[\s\S]*?^  \/\* UNIT421 END \*\/\n\n/m, '');
-base = base.replace(/^([ \t]*)\/\* UNIT421 START:[\s\S]*?\1\/\* UNIT421 END \*\/\n/gm, '');
-cut('return unit421FloorLink(fl) + h +', 'return h +');
-cut('У цьому наборі немає повних облікових паспортів для цього рівня.', 'На цьому рівні приміщень немає.');
-cut('var x = inventory[k] || {};', 'var x = t[k] || {};');
-assert.ok(!/UNIT421|unit421|U421/.test(base), 'unit 421 remnants after reversal');
-assert.equal(sha(Buffer.from(base, 'utf8')), files['index.html'].sha256, 'index.html has changes outside the unit 421 integration');
-
-// 3. m/col.json = baseline + the one unit key of the existing contour of R-421.
+assert.equal(sha(read('reports/panel.js')), GITHUB_PANEL, 'reports/panel.js is not the github.io panel');
+// 2. m/col.json = baseline + the one unit key of the existing contour of R-421.
 const col = read('m/col.json').toString('utf8');
 assert.equal(col.split('"u":"nonres:421"').length, 2);
 assert.equal(sha(Buffer.from(col.replace('"u":"nonres:421"', '"u":null'), 'utf8')), files['m/col.json'].sha256);
-
+// 3. Data embedded in index.html is unchanged: object table and building summary.
+const html = read('index.html').toString('utf8');
+const coreBytes = zlib.gunzipSync(Buffer.from(html.match(/id="ck-core">([\s\S]*?)<\/script>/)[1].trim(), 'base64'));
+const bdataText = html.match(/id="bdata">([^<]+)<\/script>/)[1];
+assert.equal(sha(coreBytes), BASE_CORE, 'object table (ck-core) differs from the VPS baseline');
+assert.equal(sha(Buffer.from(bdataText, 'utf8')), BASE_BDATA, 'building summary (bdata) differs from the VPS baseline');
 // 4. What the owner asked to keep.
-const bdata = JSON.parse(html.match(/id="bdata">([^<]+)<\/script>/)[1]);
-const core = JSON.parse(zlib.gunzipSync(Buffer.from(html.match(/id="ck-core">([\s\S]*?)<\/script>/)[1].trim(), 'base64')));
-const contours = JSON.parse(col), obj = core.obj;
+const bdata = JSON.parse(bdataText), core = JSON.parse(coreBytes), contours = JSON.parse(col), obj = core.obj;
 assert.equal(bdata.types.apt.n, manifest.expected_apartments);
 assert.equal(bdata.types.apt.area, manifest.registered_total_area_m2);
 assert.equal(bdata.types.apt.area_snapshot, manifest.registry_snapshot_date);
@@ -61,8 +53,9 @@ for (const ch of manifest.provisional_400_children) {
 }
 assert.deepEqual(contours.former_unit_groups['apt:400'].children, ['apt:400А', 'apt:400Б', 'apt:400В']);
 assert.ok(html.includes('Площа за кресленням, м²') && html.includes('Загальна за реєстром') && html.includes('Розбіжність із ДАХ'));
-assert.equal(html.split('<script src="reports/panel.js"').length, 2);
-// 5. Unit 421 still binds to the existing object only (full guard suite: tools/test_unit421.cjs).
+// 5. One reports tag with the absolute endpoint (works on github.io), one unit 421 binding.
+assert.equal(html.split('<script src="reports/panel.js" data-reporting-base="https://srv1208299.hstgr.cloud/block8-reporting/v1/reports/" defer></script>').length, 2);
+assert.equal(html.split('<script src="model-bindings/unit421.js"></script>').length, 2);
 const r421 = obj.id.indexOf('R-421');
 assert.ok(r421 >= 0 && obj.fl[r421] === 0 && obj.unit[r421] === 0 && !obj.unit.includes('nonres:421'));
-console.log('PASS baseline: 51 files match the VPS manifest except the reviewed unit 421 edits; 166 apartments, 9634.4 m2, 400А/Б/В with three doors, one reports tag');
+console.log('PASS baseline: model chunks, public data, object table and summary as in the VPS manifest; unit 421 key; github.io reports panel; 166 apartments, 9634.4 m2, 400А/Б/В with three doors');
