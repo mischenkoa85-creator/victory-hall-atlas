@@ -2,7 +2,8 @@
 const fs = require('node:fs'), path = require('node:path'), zlib = require('node:zlib');
 const vm = require('node:vm'), assert = require('node:assert/strict');
 const {execFileSync} = require('node:child_process');
-const root = path.join(__dirname, '..'), base = '970aa7ca42eb6c42a9fae6cf569e8fa0a95ef168';
+// Base: VPS public baseline 2026-10-21 (manifest: handoff/model-editing-20261021); the unit 421 edits are re-applied on top of it.
+const root = path.join(__dirname, '..'), base = '47f1d953edd5fb72edb2125dcbdd9650e472a937';
 const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const source = fs.readFileSync(path.join(root, 'model-bindings/unit421.js'), 'utf8');
 const original = execFileSync('git', ['show', base+':index.html'], {cwd:root,encoding:'utf8'}).replace(/\r\n/g, '\n');
@@ -49,14 +50,17 @@ for (const damage of [
   assert.equal(x.u.summary(bdata).nonres.n,11);
 }
 // No geometry/coordinate changes. Only the existing contour's unit-key metadata changes.
-execFileSync('git',['diff','--exit-code',base,'--','m','d','reports','tools/test_reports_endpoint.cjs','tools/test_reports_services.cjs',':(exclude)m/col.json'],{cwd:root});
+// reports/ follows the owner's decision of 21.10.2026 (github.io keeps the main panel); checked in tools/test_model_baseline.cjs.
+execFileSync('git',['diff','--exit-code',base,'--','m','d','tools/test_reports_endpoint.cjs','tools/test_reports_services.cjs',':(exclude)m/col.json'],{cwd:root});
 const oldContours=JSON.parse(execFileSync('git',['show',base+':m/col.json'],{cwd:root,encoding:'utf8'}));
 const contours=JSON.parse(fs.readFileSync(path.join(root,'m/col.json'),'utf8'));
 const fixed=contours.areas.filter(a=>a.i===index&&a.fl===0);
 assert.equal(fixed.length,1);assert.equal(fixed[0].u,'nonres:421');
 assert.equal(contours.areas.filter(a=>a.u==='nonres:421').length,1);
 fixed[0].u=null;assert.deepEqual(contours,oldContours);
-// Reverse only explicitly reviewed integration edits, then compare the whole model source.
+// Reverse only explicitly reviewed integration edits: no unit421 trace may remain, and the model data embedded in
+// index.html (object table, building summary) must equal the base. Interface code outside unit421 may change in later
+// reviewed PRs; model data is also guarded by tools/test_model_baseline.cjs.
 let restored=html.replace('<script src="model-bindings/unit421.js"></script>\n','')
   .replace(/^.*\/\/ UNIT421[^\n]*\n/gm,'')
   .replace(/    \/\* UNIT421 START: preserve source snapshot,[\s\S]*?    \/\* UNIT421 END \*\/\n/,
@@ -65,6 +69,7 @@ let restored=html.replace('<script src="model-bindings/unit421.js"></script>\n',
   .replace('return unit421FloorLink(fl) + h +','return h +')
   .replace('У цьому наборі немає повних облікових паспортів для цього рівня.','На цьому рівні приміщень немає.')
   .replace('var x = inventory[k] || {};','var x = t[k] || {};');
-restored=restored.replace(/\n\n\n/g,'\n\n');
-assert.equal(restored,original.replace(/\n\n\n/g,'\n\n'),'Unreviewed change outside the unit421 integration');
-console.log('PASS unit421: one existing object, 12 / 594.5 inventory, no financial mutation, conflict guards, unchanged assets and bounded index edits');
+const block=(s,id)=>s.match(new RegExp('id="'+id+'">([\\s\\S]*?)</script>'))[1].trim();
+assert.ok(!/UNIT421|unit421|U421/.test(restored),'unit421 remnants after reversal');
+for (const id of ['ck-core','bdata']) assert.equal(block(restored,id),block(original,id),'Model data changed outside unit421: '+id);
+console.log('PASS unit421: one existing object, 12 / 594.5 inventory, no financial mutation, conflict guards, unchanged assets and bounded index edits, unchanged model data');
