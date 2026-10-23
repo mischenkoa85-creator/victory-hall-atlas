@@ -21,11 +21,16 @@ const GITHUB_PANEL = '3e805de487fb956431d1b520205d8aeea67437a5c9856a30d2aa415179
 // Reviewed additive changes after the baseline, each proven by its own test against the commit before it.
 const REVIEWED = {
   'm/ck-shell.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
-  'm/ck-f1.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
-  'm/ck-f2.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
-  'm/doors.json': 'step 3 — closers registry (tools/test_doors_step3.cjs)',
+  'm/ck-f1.txt': 'step 3 — door closers and handles; step 6 — upper ramp, parapet, sewer along axis M, tambour 28 (tools/test_step6_ramps_doors.cjs)',
+  'm/ck-f2.txt': 'step 3 — door closers and handles; step 6 — parapet, sewer along axis M, tambour 29 (tools/test_step6_ramps_doors.cjs)',
+  'm/ck-f0.txt': 'step 6 — sewer riser K1-54 and K2-14 out of the columns, door D-10 of the concierge room (tools/test_step6_ramps_doors.cjs)',
+  'm/ck-f3.txt': 'step 6 — door D-11 of the 4th-floor lift hall (tools/test_step6_ramps_doors.cjs)',
+  'm/ck-nets.txt': 'step 6 — the same sewer moves in the whole-building network copy (tools/test_step6_ramps_doors.cjs)',
+  'm/doors.json': 'step 3 — closers registry; step 6 — six doors added (tools/test_step6_ramps_doors.cjs)',
+  'm/doortypes.json': 'step 6 — new doors in the door-type reference (tools/test_step6_ramps_doors.cjs)',
 };
 const STEP3_ADDED = 130;   // door_detail objects appended to the object table in step 3
+const STEP6_ADDED = 24;    // walls, doors, glass and door details appended in step 6
 // 1. Model chunks and public floor data are byte-identical to the VPS baseline.
 for (const [p, f] of Object.entries(files)) {
   if (p === 'index.html' || p === 'm/col.json' || p === 'reports/panel.js' || REVIEWED[p]) continue;
@@ -40,11 +45,13 @@ assert.equal(sha(Buffer.from(col.replace('"u":"nonres:421"', '"u":null'), 'utf8'
 const html = read('index.html').toString('utf8');
 const coreBytes = zlib.gunzipSync(Buffer.from(html.match(/id="ck-core">([\s\S]*?)<\/script>/)[1].trim(), 'base64'));
 const bdataText = html.match(/id="bdata">([^<]+)<\/script>/)[1];
-{ // the table equals the baseline once the step 3 door details appended at its end are taken off
-  const c = JSON.parse(coreBytes), n = c.obj.id.length - STEP3_ADDED, dd = c.cats.indexOf('door_detail');
-  assert.ok(c.obj.cat.slice(n).every(x => x === dd), 'appended objects are not door details');
+{ // the table equals the baseline once the step 3 door details and the step 6 objects appended at its end are taken off
+  const c = JSON.parse(coreBytes), n = c.obj.id.length - STEP3_ADDED - STEP6_ADDED, dd = c.cats.indexOf('door_detail');
+  assert.ok(c.obj.cat.slice(n, n + STEP3_ADDED).every(x => x === dd), 'step 3 appended objects are not door details');
+  const s6 = new Set(['walls', 'doors', 'openings', 'door_detail'].map(k => c.cats.indexOf(k)));
+  assert.ok(c.obj.cat.slice(n + STEP3_ADDED).every(x => s6.has(x)), 'step 6 appended objects are not walls, doors, glass or door details');
   for (const f of Object.keys(c.obj)) c.obj[f] = c.obj[f].slice(0, n);
-  assert.equal(sha(Buffer.from(JSON.stringify(c), 'utf8')), BASE_CORE_JSON, 'object table (ck-core) differs from the VPS baseline beyond the step 3 additions');
+  assert.equal(sha(Buffer.from(JSON.stringify(c), 'utf8')), BASE_CORE_JSON, 'object table (ck-core) differs from the VPS baseline beyond the step 3 and step 6 additions');
 }
 assert.equal(sha(Buffer.from(bdataText, 'utf8')), BASE_BDATA, 'building summary (bdata) differs from the VPS baseline');
 // 4. What the owner asked to keep.
