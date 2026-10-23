@@ -2,11 +2,13 @@
 // Proves the change is purely additive against the commit before it: existing objects, geometry and block data are unchanged;
 // only new door_detail objects are appended (table end + one new block per changed floor block), plus one sentence
 // in the door's own passport and the closers registry. Run: node tools/test_doors_step3.cjs
+// Pinned to the step 3 commit itself (c9e21bd), so later reviewed steps (step 6: tools/test_step6_ramps_doors.cjs) do not break this proof.
 const fs = require('node:fs'), path = require('node:path'), zlib = require('node:zlib'), assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const root = path.join(__dirname, '..'), base = '1634d323623824c704b454bc2501b0e9f69e935b';
 const git = p => execFileSync('git', ['show', base + ':' + p], { cwd: root, maxBuffer: 1 << 28 });
-const cur = p => fs.readFileSync(path.join(root, p));
+const step3 = 'c9e21bd9bcabab55ca955d25af32ac9007bbc8e2';
+const cur = p => execFileSync('git', ['show', step3 + ':' + p], { cwd: root, maxBuffer: 1 << 28 });
 const coreOf = html => JSON.parse(zlib.gunzipSync(Buffer.from(html.toString('utf8').match(/id="ck-core">([\s\S]*?)<\/script>/)[1].trim(), 'base64')));
 const chunkOf = buf => { const raw = zlib.gunzipSync(Buffer.from(buf.toString('utf8').trim(), 'base64')); const n = raw.readUInt32LE(0); return { head: JSON.parse(raw.subarray(4, 4 + n).toString('utf8')), bin: raw.subarray(4 + n) }; };
 const C0 = coreOf(git('index.html')), C1 = coreOf(cur('index.html'));
