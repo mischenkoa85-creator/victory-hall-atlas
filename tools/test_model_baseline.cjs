@@ -11,16 +11,24 @@ const sha = b => crypto.createHash('sha256').update(b).digest('hex');
 const read = p => fs.readFileSync(path.join(root, p));
 const files = manifest.files;
 assert.equal(Object.keys(files).length, 51);
-// Embedded data blocks of the baseline index.html (sha256 of the decoded ck-core JSON bytes and of the bdata JSON text).
-const BASE_CORE = 'eab704f59d54d12903a9fa057d775d11277b70bb4d441e5173e47bdc33247538';
+// Embedded data blocks of the baseline index.html: sha256 of JSON.stringify(parsed ck-core) and of the bdata JSON text.
+const BASE_CORE_JSON = '3eeee185c64b5190a03c49d969d87cab64a9a783b061f4e0b2c45340dba6a2aa';   // sha256 of JSON.stringify(parsed baseline ck-core), independent of how the table is re-encoded
 const BASE_BDATA = 'cac6964c1e482d50efddb71517d1ff1b894da5f989d608676530272ec3ae2975';
 // Reports panel: owner decision 21.10.2026 — github.io keeps the panel from main (personal report links);
 // the VPS panel (manifest hash) stays on the VPS deployment only.
 const GITHUB_PANEL = '3e805de487fb956431d1b520205d8aeea67437a5c9856a30d2aa4151790c7c20';
 
+// Reviewed additive changes after the baseline, each proven by its own test against the commit before it.
+const REVIEWED = {
+  'm/ck-shell.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
+  'm/ck-f1.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
+  'm/ck-f2.txt': 'step 3 — door closers and handles (tools/test_doors_step3.cjs)',
+  'm/doors.json': 'step 3 — closers registry (tools/test_doors_step3.cjs)',
+};
+const STEP3_ADDED = 130;   // door_detail objects appended to the object table in step 3
 // 1. Model chunks and public floor data are byte-identical to the VPS baseline.
 for (const [p, f] of Object.entries(files)) {
-  if (p === 'index.html' || p === 'm/col.json' || p === 'reports/panel.js') continue;
+  if (p === 'index.html' || p === 'm/col.json' || p === 'reports/panel.js' || REVIEWED[p]) continue;
   assert.equal(sha(read(p)), f.sha256, 'changed baseline file: ' + p);
 }
 assert.equal(sha(read('reports/panel.js')), GITHUB_PANEL, 'reports/panel.js is not the github.io panel');
@@ -32,7 +40,12 @@ assert.equal(sha(Buffer.from(col.replace('"u":"nonres:421"', '"u":null'), 'utf8'
 const html = read('index.html').toString('utf8');
 const coreBytes = zlib.gunzipSync(Buffer.from(html.match(/id="ck-core">([\s\S]*?)<\/script>/)[1].trim(), 'base64'));
 const bdataText = html.match(/id="bdata">([^<]+)<\/script>/)[1];
-assert.equal(sha(coreBytes), BASE_CORE, 'object table (ck-core) differs from the VPS baseline');
+{ // the table equals the baseline once the step 3 door details appended at its end are taken off
+  const c = JSON.parse(coreBytes), n = c.obj.id.length - STEP3_ADDED, dd = c.cats.indexOf('door_detail');
+  assert.ok(c.obj.cat.slice(n).every(x => x === dd), 'appended objects are not door details');
+  for (const f of Object.keys(c.obj)) c.obj[f] = c.obj[f].slice(0, n);
+  assert.equal(sha(Buffer.from(JSON.stringify(c), 'utf8')), BASE_CORE_JSON, 'object table (ck-core) differs from the VPS baseline beyond the step 3 additions');
+}
 assert.equal(sha(Buffer.from(bdataText, 'utf8')), BASE_BDATA, 'building summary (bdata) differs from the VPS baseline');
 // 4. What the owner asked to keep.
 const bdata = JSON.parse(bdataText), core = JSON.parse(coreBytes), contours = JSON.parse(col), obj = core.obj;

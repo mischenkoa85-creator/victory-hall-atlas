@@ -52,7 +52,8 @@ for (const damage of [
 // No geometry/coordinate changes. Only the existing contour's unit-key metadata changes.
 // reports/ follows the owner's decision of 21.10.2026 (github.io keeps the main panel); checked in tools/test_model_baseline.cjs.
 // d/b.enc and d/f3.enc: private snapshot updated for 166 apartments / 400А-Б-В (owner decision 21.10.2026, step 4); unit 421 adds nothing there.
-execFileSync('git',['diff','--exit-code',base,'--','m','d','tools/test_reports_endpoint.cjs','tools/test_reports_services.cjs',':(exclude)m/col.json',':(exclude)d/b.enc',':(exclude)d/f3.enc'],{cwd:root});
+// m/ck-shell.txt, m/ck-f1.txt, m/ck-f2.txt, m/doors.json: door closers and handles appended in step 3 (proven additive by tools/test_doors_step3.cjs).
+execFileSync('git',['diff','--exit-code',base,'--','m','d','tools/test_reports_endpoint.cjs','tools/test_reports_services.cjs',':(exclude)m/col.json',':(exclude)d/b.enc',':(exclude)d/f3.enc',':(exclude)m/ck-shell.txt',':(exclude)m/ck-f1.txt',':(exclude)m/ck-f2.txt',':(exclude)m/doors.json'],{cwd:root});
 const oldContours=JSON.parse(execFileSync('git',['show',base+':m/col.json'],{cwd:root,encoding:'utf8'}));
 const contours=JSON.parse(fs.readFileSync(path.join(root,'m/col.json'),'utf8'));
 const fixed=contours.areas.filter(a=>a.i===index&&a.fl===0);
@@ -72,5 +73,12 @@ let restored=html.replace('<script src="model-bindings/unit421.js"></script>\n',
   .replace('var x = inventory[k] || {};','var x = t[k] || {};');
 const block=(s,id)=>s.match(new RegExp('id="'+id+'">([\\s\\S]*?)</script>'))[1].trim();
 assert.ok(!/UNIT421|unit421|U421/.test(restored),'unit421 remnants after reversal');
-for (const id of ['ck-core','bdata']) assert.equal(block(restored,id),block(original,id),'Model data changed outside unit421: '+id);
+assert.equal(block(restored,'bdata'),block(original,'bdata'),'Model data changed outside unit421: bdata');
+{ // object table: equal to the base once objects appended later (door details, step 3) are taken off its end
+  const dec=s=>JSON.parse(zlib.gunzipSync(Buffer.from(block(s,'ck-core'),'base64')));
+  const a=dec(original), c=dec(restored), n=a.obj.id.length, dd=c.cats.indexOf('door_detail');
+  assert.ok(c.obj.cat.slice(n).every(x=>x===dd),'objects appended after the base are not door details');
+  for (const f of Object.keys(c.obj)) c.obj[f]=c.obj[f].slice(0,n);
+  assert.deepEqual(c,a,'Model data changed outside unit421: ck-core');
+}
 console.log('PASS unit421: one existing object, 12 / 594.5 inventory, no financial mutation, conflict guards, unchanged assets and bounded index edits, unchanged model data');
