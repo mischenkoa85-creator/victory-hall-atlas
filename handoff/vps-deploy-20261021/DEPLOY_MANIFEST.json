@@ -1,15 +1,16 @@
 {
  "schema": "atlas.vps-deploy/1",
- "prepared": "2026-10-21",
- "source_commit": "c9e21bd9bcabab55ca955d25af32ac9007bbc8e2",
- "source_branch": "claude/doors-step3-20261021",
+ "prepared": "2026-10-23",
+ "source_commit": "bc56ed7bbc351aaeb002c95098cde0576afb1f82",
+ "source_branch": "claude/doors-ramps-step6-20261023",
  "includes_prs": [
   5,
   6,
   7,
   8,
   9,
-  10
+  10,
+  12
  ],
  "note": "Static files only. No build step. Files are taken byte-for-byte from source_commit; the VPS variant differs only in the two entries under vps_variant.",
  "files": {
@@ -194,16 +195,16 @@
    "bytes": 3011
   },
   "index.html": {
-   "sha256": "94df132a479f32eadee9b51f01e1688bca1a6fde32e29e51b6bfd52a248cf2bf",
-   "bytes": 1032059
+   "sha256": "f992b71d8c70ccbb57de47d0bab5c38f9bc58a0a5f245ccbbd763b5890c0e8e6",
+   "bytes": 1032499
   },
   "m/ck-f0.txt": {
-   "sha256": "a245086a42f5560228c5eebc69838cb8de7e7eb5e1a067d2a2f01b05b1e2c5fd",
-   "bytes": 952924
+   "sha256": "24b90f7f12b92a0fdcb4c6dfb4230fce767c0841f34834bf4af3906a22eb36f5",
+   "bytes": 954792
   },
   "m/ck-f1.txt": {
-   "sha256": "3e06cfe1a218a6d2a577707dfe383337a6d1e9d14c4ed3a0ef7b4fb86f45758f",
-   "bytes": 515000
+   "sha256": "444ebcc658a5d356243b14407efbb245a56a9331b67d7bbaa17bac2d68eab350",
+   "bytes": 519132
   },
   "m/ck-f10.txt": {
    "sha256": "bee980e329358b58240ae684c7f05a8fc1d737e4056378039fed437bf43e4a9d",
@@ -246,8 +247,8 @@
    "bytes": 50968
   },
   "m/ck-f2.txt": {
-   "sha256": "d000ac5e1822d7cc3c2d20c95766b41b17620f5d589076803d9a5184da65f672",
-   "bytes": 637160
+   "sha256": "f7bd369f3bb8c6a810c3d087fabb7a668dcc4c216e889fcf718ec525cc3036e6",
+   "bytes": 639688
   },
   "m/ck-f20.txt": {
    "sha256": "b8f8d8111e4be04c5424a92d65f75298575ff1431f42a3aa8e439ff8752fd9bc",
@@ -258,8 +259,8 @@
    "bytes": 9068
   },
   "m/ck-f3.txt": {
-   "sha256": "fcb0656796f9fd3b413325af7c344ff8ca617a67e104fa366130357ecf192b56",
-   "bytes": 615724
+   "sha256": "bdf9ff108b0db6c50dedac697cd531740a96f009956ffbc73087f03dc87c4709",
+   "bytes": 617488
   },
   "m/ck-f4.txt": {
    "sha256": "a3f2104e17b82e682dcec5bab3f8e3660355945b7c17c9b70444f85853ef9a0d",
@@ -286,8 +287,8 @@
    "bytes": 56824
   },
   "m/ck-nets.txt": {
-   "sha256": "13073968679e70f1eb9fc0417c8deb9b4691a869ce385ec86cfd3d614ce9cbb3",
-   "bytes": 1737364
+   "sha256": "cd87eafebe794f67456987c9d2de86e776e0370bbb55342fb027a9a9cd3771af",
+   "bytes": 1737336
   },
   "m/ck-shell.txt": {
    "sha256": "aba9ea74f397b4da0fd203e723993fabcf578d07646241cddb56385b6af25263",
@@ -298,12 +299,12 @@
    "bytes": 546530
   },
   "m/doors.json": {
-   "sha256": "f777f2ede0d4971c6230a0c9d92b098147e444d2ff5790c9e1931c5900035751",
-   "bytes": 37634
+   "sha256": "54802562a6825fe56767b866b513dbc52e908e51df417780aa2be15fb68def15",
+   "bytes": 38934
   },
   "m/doortypes.json": {
-   "sha256": "4295d81dbbba183c43d67f0383a5638c9836fddd978c18d173a5a24232fea395",
-   "bytes": 23461
+   "sha256": "b9340a3a24e50980b7f8e898ba6bbf50ea0e24a3f2a2637ae8cbe7ae090d69b1",
+   "bytes": 23310
   },
   "model-bindings/unit421.js": {
    "sha256": "a45a46bff1b75fdb6531914aa30ffe42b2e7edcb0db3a60845b7625fc4c181b6",
@@ -325,18 +326,22 @@
     "<script src=\"reports/panel.js\" data-reporting-base=\"https://srv1208299.hstgr.cloud/block8-reporting/v1/reports/\" defer></script>",
     "<script src=\"reports/panel.js\" data-reporting-base=\"/block8-reporting/v1/reports/\" defer></script>"
    ],
-   "sha256": "76b6242e036222fc6f0c4353fa88de1bc6320fc81f0c496901d1a17c93f2e8d5",
-   "bytes": 1032029
+   "sha256": "28199eb53394e6038d4be933d0f947006974bde6ab175ff8dfeffbe9ea529319",
+   "bytes": 1032469
   }
  },
  "compared_with_vps_baseline": {
   "changed": [
    "index.html",
+   "m/ck-f0.txt",
    "m/ck-f1.txt",
    "m/ck-f2.txt",
+   "m/ck-f3.txt",
+   "m/ck-nets.txt",
    "m/ck-shell.txt",
    "m/col.json",
    "m/doors.json",
+   "m/doortypes.json",
    "reports/panel.js"
   ],
   "new": [
@@ -363,11 +368,23 @@
    "d/f7.enc",
    "d/f8.enc",
    "d/f9.enc",
-   "model-bindings/unit421.js"
+   "model-bindings/README.md",
+   "model-bindings/unit421.js",
+   "reports/README.md"
   ],
   "private_encrypted_changed_vs_main_d155c6e": [
    "d/b.enc",
    "d/f3.enc"
   ]
- }
+ },
+ "changed_since_previous_package_c9e21bd": [
+  "index.html",
+  "m/ck-f0.txt",
+  "m/ck-f1.txt",
+  "m/ck-f2.txt",
+  "m/ck-f3.txt",
+  "m/ck-nets.txt",
+  "m/doors.json",
+  "m/doortypes.json"
+ ]
 }
