@@ -3,7 +3,7 @@
   "date": "2026-10-31",
   "source_sql_sha256": "dca4503b70d11d6029559bccc3203160da3e3c36ce580f2884d7e3d75db0e397",
   "api_sha256": "177b0d0daf565d0ed2ff3370df78a00b504deb696ca76c105ee07d7985046de6",
-  "workspace_sha256": "ccd1bb39720e42cd6fe4cfc5375895401d9edbe30cfba7559124a9630a1e911d",
+  "workspace_sha256": "df58e0a76d564fb21dd9e83b6f6846173bb9ec9e6cc16d6c12eaa5185b67abe3",
   "migration": "0121_atlas_board_rework_20261031",
   "migration_checksum": "4ad2dcab8da686aa1c76effd35fb5d66ebb720818031650f4d2c844b0667414f",
   "schema_fingerprint": "b086b25f0760c4f75f807e9f1036a2ac20b0fc1983183185c0334f97ec167bda",
@@ -21,7 +21,8 @@
     "native_service_prerequisites": "PASS",
     "public_anonymous_private_routes": "401",
     "owner_browser_sso_and_workspace_access": "PASS",
-    "physical_phone": "NOT_TESTED"
+    "physical_phone": "NOT_TESTED",
+    "stale_receipt_readback": "PASS_BROWSER_AND_MOCK_SEPARATE_HASHES_SEE_UI_WRITE_READBACK_REVIEW"
   },
   "data_boundary": {
     "production_test_tasks_or_stock_created": false,
