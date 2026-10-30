@@ -6,6 +6,53 @@ SET LOCAL lock_timeout='3s';
 SET LOCAL statement_timeout='30s';
 CREATE SCHEMA atlas_ops AUTHORIZATION vh_owner;
 
+-- Durable outcome per verified actor/facility/domain/key. Tombstones are immutable.
+CREATE TABLE atlas_ops.command_resolution (
+ facility_id uuid NOT NULL,actor_id uuid NOT NULL REFERENCES core.app_user(user_id),
+ domain text NOT NULL CHECK(domain IN ('warehouse','board','attachment','item','location','category')),
+ command_key text NOT NULL CHECK(length(command_key) BETWEEN 1 AND 128),
+ status text NOT NULL CHECK(status IN ('COMMITTED','CANCELLED')),
+ request jsonb,receipt jsonb,target jsonb NOT NULL DEFAULT '{}',
+ created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+ PRIMARY KEY(facility_id,actor_id,domain,command_key),
+ CHECK((status='COMMITTED' AND request IS NOT NULL AND receipt IS NOT NULL)
+ OR (status='CANCELLED' AND request IS NULL AND receipt IS NULL))
+);
+CREATE FUNCTION atlas_ops._command_lock(p_facility uuid,p_actor uuid,p_domain text,p_key text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ IF p_facility IS NULL OR p_actor IS NULL OR p_domain IS NULL
+ OR p_domain NOT IN ('warehouse','board','attachment','item','location','category')
+ OR p_key IS NULL OR length(p_key) NOT BETWEEN 1 AND 128
+ THEN RAISE EXCEPTION 'COMMAND_INPUT' USING ERRCODE='22023'; END IF;
+ PERFORM pg_advisory_xact_lock(hashtextextended(p_domain||':key:'||p_facility||':'||p_actor||':'||p_key,0));
+END $$;
+CREATE FUNCTION atlas_ops._command_guard(p_facility uuid,p_actor uuid,p_domain text,p_key text)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+BEGIN
+ PERFORM atlas_ops._command_lock(p_facility,p_actor,p_domain,p_key);
+ IF EXISTS(SELECT 1 FROM atlas_ops.command_resolution WHERE facility_id=p_facility AND actor_id=p_actor
+ AND domain=p_domain AND command_key=p_key AND status='CANCELLED')
+ THEN RAISE EXCEPTION 'COMMAND_CANCELLED' USING ERRCODE='22023'; END IF;
+END $$;
+CREATE FUNCTION atlas_ops._command_commit(p_facility uuid,p_actor uuid,p_domain text,p_key text,p_request jsonb,p_receipt jsonb,p_target jsonb)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+DECLARE s core.app_session;c atlas_ops.command_resolution;
+BEGIN
+ s:=core._atlas_context(true);
+ IF s.user_id<>p_actor THEN RAISE EXCEPTION 'COMMAND_SCOPE_DENIED' USING ERRCODE='42501'; END IF;
+ PERFORM atlas_ops._command_guard(p_facility,p_actor,p_domain,p_key);
+ SELECT * INTO c FROM atlas_ops.command_resolution WHERE facility_id=p_facility AND actor_id=p_actor AND domain=p_domain AND command_key=p_key;
+ IF FOUND THEN
+  IF c.request IS DISTINCT FROM p_request OR c.receipt IS DISTINCT FROM p_receipt OR c.target IS DISTINCT FROM p_target
+  THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT' USING ERRCODE='22023'; END IF;
+  RETURN;
+ END IF;
+ INSERT INTO atlas_ops.command_resolution(facility_id,actor_id,domain,command_key,status,request,receipt,target)
+ VALUES(p_facility,p_actor,p_domain,p_key,'COMMITTED',p_request,p_receipt,p_target);
+ PERFORM core._atlas_audit('command.committed',s.user_id,s.session_id,jsonb_build_object('facility_id',p_facility,'domain',p_domain,'key',p_key));
+END $$;
+
 CREATE TABLE atlas_ops.warehouse_grant (
  grant_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  user_id uuid NOT NULL REFERENCES core.app_user(user_id),
@@ -86,6 +133,8 @@ CREATE TRIGGER warehouse_operation_immutable BEFORE UPDATE OR DELETE ON atlas_op
 FOR EACH ROW EXECUTE FUNCTION atlas_ops._warehouse_immutable();
 CREATE TRIGGER warehouse_ledger_immutable BEFORE UPDATE OR DELETE ON atlas_ops.warehouse_ledger
 FOR EACH ROW EXECUTE FUNCTION atlas_ops._warehouse_immutable();
+CREATE TRIGGER command_resolution_immutable BEFORE UPDATE OR DELETE ON atlas_ops.command_resolution
+FOR EACH ROW EXECUTE FUNCTION atlas_ops._warehouse_immutable();
 
 CREATE FUNCTION atlas_ops._warehouse_has(p_user uuid,p_facility uuid,p_location uuid,p_capability text)
 RETURNS boolean LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog AS $$
@@ -103,27 +152,47 @@ END $$;
 -- Catalog keys are operational identifiers, not canonical ENTITY_UID allocation.
 CREATE FUNCTION atlas_ops.warehouse_put_item(p_facility uuid,p_item uuid,p_label text,p_unit text,p_kind text)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE s core.app_session; i atlas_ops.warehouse_item;
+DECLARE s core.app_session; i atlas_ops.warehouse_item;c atlas_ops.command_resolution;r jsonb;n integer;
 BEGIN
  s:=core._atlas_context(true); PERFORM atlas_ops._warehouse_require(s.user_id,p_facility,NULL,'warehouse.catalog');
+ r:=jsonb_build_object('item_id',p_item,'label',p_label,'unit',p_unit,'kind',p_kind);
+ PERFORM atlas_ops._command_guard(p_facility,s.user_id,'item',p_item::text);
+ SELECT * INTO c FROM atlas_ops.command_resolution WHERE facility_id=p_facility AND actor_id=s.user_id AND domain='item' AND command_key=p_item::text;
+ IF FOUND THEN
+  IF c.request IS DISTINCT FROM r THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
+  PERFORM core._atlas_audit('command.replay',s.user_id,s.session_id,jsonb_build_object('domain','item','key',p_item));RETURN p_item;
+ END IF;
  INSERT INTO atlas_ops.warehouse_item(facility_id,item_id,label,unit,kind,created_by)
  VALUES(p_facility,p_item,p_label,p_unit,p_kind,s.user_id) ON CONFLICT DO NOTHING;
+ GET DIAGNOSTICS n=ROW_COUNT;
+ IF n<>1 THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
  SELECT * INTO i FROM atlas_ops.warehouse_item WHERE facility_id=p_facility AND item_id=p_item;
  IF (i.label,i.unit,i.kind) IS DISTINCT FROM (p_label,p_unit,p_kind)
  THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
  PERFORM core._atlas_audit('warehouse.catalog.item',s.user_id,s.session_id,jsonb_build_object('facility_id',p_facility,'item_id',p_item));
+ PERFORM atlas_ops._command_commit(p_facility,s.user_id,'item',p_item::text,r,to_jsonb(p_item),jsonb_build_object('item_id',p_item));
  RETURN p_item;
 END $$;
 CREATE FUNCTION atlas_ops.warehouse_put_location(p_facility uuid,p_location uuid,p_label text)
 RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
-DECLARE s core.app_session; v_label text;
+DECLARE s core.app_session; v_label text;c atlas_ops.command_resolution;r jsonb;n integer;
 BEGIN
  s:=core._atlas_context(true); PERFORM atlas_ops._warehouse_require(s.user_id,p_facility,NULL,'warehouse.catalog');
+ r:=jsonb_build_object('location_id',p_location,'label',p_label);
+ PERFORM atlas_ops._command_guard(p_facility,s.user_id,'location',p_location::text);
+ SELECT * INTO c FROM atlas_ops.command_resolution WHERE facility_id=p_facility AND actor_id=s.user_id AND domain='location' AND command_key=p_location::text;
+ IF FOUND THEN
+  IF c.request IS DISTINCT FROM r THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
+  PERFORM core._atlas_audit('command.replay',s.user_id,s.session_id,jsonb_build_object('domain','location','key',p_location));RETURN p_location;
+ END IF;
  INSERT INTO atlas_ops.warehouse_location(facility_id,location_id,label,created_by)
  VALUES(p_facility,p_location,p_label,s.user_id) ON CONFLICT DO NOTHING;
+ GET DIAGNOSTICS n=ROW_COUNT;
+ IF n<>1 THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
  SELECT label INTO v_label FROM atlas_ops.warehouse_location WHERE facility_id=p_facility AND location_id=p_location;
  IF v_label IS DISTINCT FROM p_label THEN RAISE EXCEPTION 'CATALOG_KEY_CONFLICT' USING ERRCODE='22023'; END IF;
  PERFORM core._atlas_audit('warehouse.catalog.location',s.user_id,s.session_id,jsonb_build_object('facility_id',p_facility,'location_id',p_location));
+ PERFORM atlas_ops._command_commit(p_facility,s.user_id,'location',p_location::text,r,to_jsonb(p_location),jsonb_build_object('location_id',p_location));
  RETURN p_location;
 END $$;
 
@@ -144,7 +213,7 @@ BEGIN
  v_request:=jsonb_build_object('facility',p_facility,'kind',p_kind,'item',p_item,'quantity',p_quantity,
  'from',p_from,'to',p_to,'document',p_document,'reason',p_reason,'work',p_work,'object',p_object,'reference',p_reference);
  -- Serialize retries even when the caller changes the item under the same key.
- PERFORM pg_advisory_xact_lock(hashtextextended('warehouse:key:'||p_facility||':'||s.user_id||':'||p_key,0));
+ PERFORM atlas_ops._command_guard(p_facility,s.user_id,'warehouse',p_key);
  SELECT * INTO prior FROM atlas_ops.warehouse_operation
  WHERE facility_id=p_facility AND actor_id=s.user_id AND idempotency_key=p_key;
  IF FOUND AND prior.request IS DISTINCT FROM v_request THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT' USING ERRCODE='22023'; END IF;
@@ -175,6 +244,8 @@ BEGIN
  END LOOP;
  IF prior.operation_id IS NOT NULL THEN
   PERFORM core._atlas_audit('warehouse.replay',s.user_id,s.session_id,jsonb_build_object('operation_id',prior.operation_id));
+  PERFORM atlas_ops._command_commit(p_facility,s.user_id,'warehouse',p_key,v_request,prior.result,
+   jsonb_build_object('locations',to_jsonb(array_remove(ARRAY[prior.from_location,prior.to_location],NULL))));
   RETURN prior.result;
  END IF;
  -- Per-item lock makes transfers / concurrent issues deterministic; all locations lock in UUID order.
@@ -206,6 +277,8 @@ BEGIN
  INSERT INTO atlas_ops.warehouse_ledger(facility_id,operation_id,item_id,location_id,delta,resulting_quantity)
  SELECT p_facility,v_id,p_item,(x->>'location_id')::uuid,(x->>'delta')::numeric,(x->>'quantity')::numeric FROM jsonb_array_elements(v_results) x;
  PERFORM core._atlas_audit('warehouse.'||p_kind,s.user_id,s.session_id,jsonb_build_object('facility_id',p_facility,'operation_id',v_id));
+ PERFORM atlas_ops._command_commit(p_facility,s.user_id,'warehouse',p_key,v_request,v_result,
+  jsonb_build_object('locations',to_jsonb(array_remove(ARRAY[v_from,v_to],NULL))));
  RETURN v_result;
 END $$;
 
@@ -261,7 +334,7 @@ END $$;
 DO $security$
 DECLARE t text; fn record;
 BEGIN
- FOREACH t IN ARRAY ARRAY['warehouse_grant','warehouse_item','warehouse_location','warehouse_stock','warehouse_operation','warehouse_ledger'] LOOP
+ FOREACH t IN ARRAY ARRAY['command_resolution','warehouse_grant','warehouse_item','warehouse_location','warehouse_stock','warehouse_operation','warehouse_ledger'] LOOP
   EXECUTE format('ALTER TABLE atlas_ops.%I ENABLE ROW LEVEL SECURITY',t);
   EXECUTE format('ALTER TABLE atlas_ops.%I FORCE ROW LEVEL SECURITY',t);
   EXECUTE format('CREATE POLICY warehouse_owner_only ON atlas_ops.%I FOR ALL TO vh_owner USING (true) WITH CHECK (true)',t);

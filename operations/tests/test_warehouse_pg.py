@@ -20,6 +20,9 @@ parser.add_argument('--http-check',action='store_true',help='Also execute real H
 parser.add_argument('--board-check',action='store_true',help='Also apply and test board candidate only in this new synthetic cluster')
 parser.add_argument('--board-http-check',action='store_true',help='Also run board HTTP to actual SQL integration; implies --board-check')
 parser.add_argument('--fast-initdb',action='store_true',help='Skip only initdb final sync for this disposable fixture; runtime fsync remains on')
+parser.add_argument('--attachments-check',action='store_true',help='POSIX real private-files + HTTP + PG attachment check; implies board SQL check')
+parser.add_argument('--workspace-check',action='store_true',help='Scoped workspace context/category API on this new synthetic cluster')
+parser.add_argument('--resolution-check',action='store_true',help='Durable command resolver; includes board/attachments/workspace on this new cluster')
 args=parser.parse_args()
 ROOT=args.output.resolve();DATA=ROOT/'data'
 if ROOT.exists():raise SystemExit('REFUSE_EXISTING_TEST_DIRECTORY')
@@ -193,7 +196,7 @@ try:
     def metadata():
         with admin() as c:
             rows=c.execute("SELECT relrowsecurity,relforcerowsecurity FROM pg_class p JOIN pg_namespace n ON n.oid=p.relnamespace WHERE n.nspname='atlas_ops' AND p.relkind='r'").fetchall()
-            assert len(rows)==6 and all(a and b for a,b in rows)
+            assert len(rows)==7 and all(a and b for a,b in rows)
             assert c.execute("SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace CROSS JOIN LATERAL aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a WHERE n.nspname='atlas_ops' AND a.grantee=0").fetchone()[0]==0
             assert c.execute('SELECT count(*) FROM atlas_ops.warehouse_stock WHERE quantity<0').fetchone()[0]==0
     check('RLS FORCE public execute absent and nonnegative invariant',metadata)
@@ -202,7 +205,7 @@ try:
         sys.path.insert(0,str(Path(__file__).parent))
         from warehouse_http_pg_check import run_http_checks
         run_http_checks(CFG,ROOT,person,grant)
-    if args.board_check or args.board_http_check:
+    if args.board_check or args.board_http_check or args.attachments_check or args.workspace_check or args.resolution_check:
         sys.path.insert(0,str(Path(__file__).parent))
         from board_pg_check import run_board_checks
         run_board_checks(CFG,ROOT,person,request)
@@ -210,6 +213,19 @@ try:
         sys.path.insert(0,str(args.session_sql_dir.parent))
         from board_http_pg_check import run_board_http_checks
         run_board_http_checks(CFG,ROOT,person)
+    if args.attachments_check or args.resolution_check:
+        sys.path.insert(0,str(args.session_sql_dir.parent))
+        from attachments_pg_check import run_attachment_checks
+        run_attachment_checks(CFG,ROOT,person)
+    if args.workspace_check or args.resolution_check:
+        sys.path.insert(0,str(args.session_sql_dir.resolve().parent))
+        sys.path.insert(0,str(SQL.parents[1]))
+        from workspace_pg_check import run_workspace_checks
+        run_workspace_checks(CFG,ROOT,person)
+    if args.resolution_check:
+        sys.path.insert(0,str(args.session_sql_dir.resolve().parent))
+        from command_resolution_pg_check import run_resolution_checks
+        run_resolution_checks(CFG,ROOT,person)
     (ROOT/'RESULT.json').write_text(json.dumps({'status':'PASS_SYNTHETIC_PG17','tests':results,'sql_sha256':hashlib.sha256(SQL.read_bytes()).hexdigest(),'production_connected':False,'session_core':'actual 01_session_core.sql; synthetic sessions inserted by isolated fixture administrator','http_sql_integration_run':args.http_check,'not_tested':['browser acceptance','live migration','reservations','partial returns','arbitrary corrections']+([] if args.http_check else ['HTTP to SQL integration'])},indent=2),encoding='utf8')
 finally:
     if started:run([pgtool('pg_ctl'),'-D',DATA,'-m','fast','-w','stop'])

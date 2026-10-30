@@ -1,0 +1,33 @@
+{
+  "server_release": "/opt/victory-hall-atlas-bff/releases/atlas-session-5295450a2d458ca6",
+  "hash_only_files": {
+    "SOURCE_MANIFEST.json": "5295450a2d458ca6a3b6ff6a3977e55d61047bc9af2a3c0d65c1c36a743142f6",
+    "session/service-candidate/assembly.py": "65cf39c0c961100ad547111110cbbac5aa7926598576790989fb3b62e2abc134",
+    "session/service-candidate/logging.json": "bb9e531055210ff1ed5c3fbf3a92613595594429e2a659262da9123f734e72a5",
+    "session/bff/app.py": "414601426e04295795ca957a013046ce0b0728de597615ad78e068789ff61829",
+    "session/bff/models.py": "149644905bccd8554174dd94fea83a25fafb659946e2dfefd25f78ca5af5fe0f",
+    "session/bff/security.py": "5f08327118e0efb91693f87ee83a5b0368e849254a4f8b020a569b3975921a47",
+    "session/bff/repository.py": "eebca9e9578237e648f60c0d494e174ecbd9b339e602c9621f049e3b945d35a5",
+    "session/bff/google_service.py": "4aba96468941fd3efee7f9bf0f65fb8ed903d75cb2e35343fea574dfae0c5ddf",
+    "session/reporting/adapter.py": "b98c1e416cbdbe8a6a243337311780cf9e016588527c6c098bf707e17022564e"
+  },
+  "safe_unit_metadata": [
+    "User",
+    "Group",
+    "WorkingDirectory",
+    "ProtectSystem",
+    "ReadWritePaths",
+    "ReadOnlyPaths",
+    "UMask",
+    "ExecStart",
+    "ExecStartPre"
+  ],
+  "excluded": [
+    "Environment",
+    "EnvironmentFile contents",
+    "credentials",
+    "private photo data"
+  ],
+  "local_code_complete": true,
+  "fresh_server_hashes_pending": true
+}

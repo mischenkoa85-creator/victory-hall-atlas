@@ -1,45 +1,85 @@
 {
-  "status": "PREPARED_NOT_EXECUTED_ON_LINUX",
+  "status": "PASS_LINUX_SYNTHETIC",
   "files": {
-    "operations/sql/001_warehouse_candidate.sql": {
-      "sha256": "81b82edec86153f21b8b101ba6dbec3075e98cc7918ccbca03ff7f59b2d61661",
-      "bytes": 19498
+    "operations/attachment_api.py": {
+      "sha256": "642db9822da0593b607e622ea2edd09914abdf42067c299aeb899e5a954cc7cc",
+      "bytes": 6785
     },
-    "operations/sql/002_board_candidate.sql": {
-      "sha256": "070e57c88219a4a77fbcc36ecb689a9a7bf9f2bad5207c8d1c67452709704403",
-      "bytes": 25171
-    },
-    "operations/warehouse_api.py": {
-      "sha256": "0845e613a36bb33aabbeefb83a33e37f0ffd60828ee0b7cf9b0233a43504a89e",
-      "bytes": 6496
+    "operations/attachment_store.py": {
+      "sha256": "095f43b8b5b6e8fcc4ff16f3389dc6d463aec71ab4155b1905846f36efeda643",
+      "bytes": 8676
     },
     "operations/board_api.py": {
-      "sha256": "2d9c27d3b637c77c6de26443b9a88da403d996947e3e380ca74cedde4e807fdc",
-      "bytes": 9739
+      "sha256": "0c26912f595ce916cb954274c8fa3f7a6a2c0501fbb8f0a6ce00ba153a80f932",
+      "bytes": 9866
     },
-    "operations/tests/test_warehouse_pg.py": {
-      "sha256": "2c2c2e8a0a0ed39a71115f0b373679bf012bdb124f5f34e88e82596c7b966d4c",
-      "bytes": 16000
+    "operations/command_resolution_api.py": {
+      "sha256": "37811bee2782d5312730c18c365062a4b5ef56d5c262cf57f6cb9c74867214a5",
+      "bytes": 2955
     },
-    "operations/tests/warehouse_http_pg_check.py": {
-      "sha256": "20f73ec8b73ebda41c0a5f95a366523a0c60c506f8d28962bb27ea7a123d1a6c",
-      "bytes": 8712
+    "operations/requirements-attachments.txt": {
+      "sha256": "ce79e42d7f2f60bcc014f20de2a921b77ffd4cb5a4a1f9a063670710d0e6f531",
+      "bytes": 79
     },
-    "operations/tests/board_pg_check.py": {
-      "sha256": "c694b01d36c739a5f653d3cef7aba46dd1be1702e451ff169915dcab6f5aefb1",
-      "bytes": 16021
+    "operations/sql/001_warehouse_candidate.sql": {
+      "sha256": "b14465c0a8b079f4da1a17f166aa63c9054a1c8d184c2a05bab292c36d093482",
+      "bytes": 24890
+    },
+    "operations/sql/002_board_candidate.sql": {
+      "sha256": "d99d4f3b1c8889ff7ee47082c329e6c6e95aa74d6c95009dfe2e6d04130dafb5",
+      "bytes": 25806
+    },
+    "operations/sql/003_attachments_candidate.sql": {
+      "sha256": "451c7a6a5b40c6e15c783fe283a24c1f617d62fc8292c9f7474e14b895dea17f",
+      "bytes": 10492
+    },
+    "operations/sql/004_workspace_context_candidate.sql": {
+      "sha256": "efdacbe71de1ecd48559e8661209930fde7606bd3ade85544ada50e6ac4b1dff",
+      "bytes": 7007
+    },
+    "operations/sql/005_command_resolution_candidate.sql": {
+      "sha256": "a6b9b2401b007c0989cfeb6615d40e93cb2487165aaa320aad2c674100288ef5",
+      "bytes": 5195
+    },
+    "operations/tests/attachments_pg_check.py": {
+      "sha256": "b2db04ec72d2fee23971e3bfcb09746451e3ef684a022161c86be274ab8a4f74",
+      "bytes": 13463
     },
     "operations/tests/board_http_pg_check.py": {
       "sha256": "26e53222f07de9ea66fe287e6cda888000f603b634777ded458fa9c6a414d537",
       "bytes": 12847
     },
-    "session/sql/00_roles.sql": {
-      "sha256": "36d2d38918e6092fc167041abdd6624bd321a9d94740cb707f769d85acffdc9b",
-      "bytes": 396
+    "operations/tests/board_pg_check.py": {
+      "sha256": "c694b01d36c739a5f653d3cef7aba46dd1be1702e451ff169915dcab6f5aefb1",
+      "bytes": 16021
     },
-    "session/sql/01_session_core.sql": {
-      "sha256": "ec1b9e3316f81be460ed4ef6788a7ead7ffd9136d5757ec15f9f1d77b76408fc",
-      "bytes": 27294
+    "operations/tests/command_resolution_pg_check.py": {
+      "sha256": "05652687b891ff6e2623df6f9067e93a4c1c1b36ec27ef1fed0207ba488934e9",
+      "bytes": 14565
+    },
+    "operations/tests/test_attachment_store.py": {
+      "sha256": "a3d43f13b31c95d3b9faa38d613ba8a11b00790569574491db4749307dcf9ecb",
+      "bytes": 6408
+    },
+    "operations/tests/test_warehouse_pg.py": {
+      "sha256": "14df0deb31a094b9ec6d8708605ce40aef08b66d736f84632da6783cdf5f0c8b",
+      "bytes": 17232
+    },
+    "operations/tests/warehouse_http_pg_check.py": {
+      "sha256": "20f73ec8b73ebda41c0a5f95a366523a0c60c506f8d28962bb27ea7a123d1a6c",
+      "bytes": 8712
+    },
+    "operations/tests/workspace_pg_check.py": {
+      "sha256": "5f613c7081a88e8e1f106843a086b5f66ac7ca64502a0ace7b8c068500e7ad20",
+      "bytes": 9428
+    },
+    "operations/warehouse_api.py": {
+      "sha256": "489168d51672ea3b3fe612965ab8b1d731afec490d18676429371300ceddb29d",
+      "bytes": 6626
+    },
+    "operations/workspace_api.py": {
+      "sha256": "edeec508228990c83c344cb22fa1f3f591df8ffb47f60e735c3b53e407febac0",
+      "bytes": 2524
     },
     "session/bff/__init__.py": {
       "sha256": "e073aa821520d8aa482277b9f0c53885882022e2729ff6570e18c48dec90ed21",
@@ -60,8 +100,18 @@
     "session/requirements.lock": {
       "sha256": "43a99222e63e7134ebaa38b7633887af477f9c120cbc43bbf5c6f950128d3a17",
       "bytes": 536
+    },
+    "session/sql/00_roles.sql": {
+      "sha256": "36d2d38918e6092fc167041abdd6624bd321a9d94740cb707f769d85acffdc9b",
+      "bytes": 396
+    },
+    "session/sql/01_session_core.sql": {
+      "sha256": "ec1b9e3316f81be460ed4ef6788a7ead7ffd9136d5757ec15f9f1d77b76408fc",
+      "bytes": 27294
     }
   },
-  "syntax_check": "PASS",
-  "credential_files_included": false
+  "receipt_sha256": "bbf0b3efdf6cf74b47ad23b37cb504e1ed22cfad53ae4564fcb4aa03efc24e61",
+  "cluster_stopped": true,
+  "credential_files_included": false,
+  "scope": "New synthetic cluster only; current BFF and restored GREEN clone have separate integration receipts."
 }

@@ -1,55 +1,63 @@
-PORTABLE SYNTHETIC WAREHOUSE / BOARD REHEARSAL
+PORTABLE SYNTHETIC WAREHOUSE / BOARD / PHOTO / COMMAND REHEARSAL
 
-Runtime bundle layout (15 files; include exact bytes, never live credentials):
+Actual Linux R2 execution: PASS; private Unix-only cluster stopped.
+Exact-byte dependency manifest: REHEARSAL_FILES.json (27 files).
+Files prefixed session/ are external reviewed session-core dependencies supplied
+by the operator. This synthetic core is not claimed to be the current production
+BFF; operations/integration separately checks the current assembled BFF on a
+private restored clone with real low-privilege roles.
+
+Bundle files:
+operations/attachment_api.py
+operations/attachment_store.py
+operations/board_api.py
+operations/command_resolution_api.py
+operations/requirements-attachments.txt
 operations/sql/001_warehouse_candidate.sql
 operations/sql/002_board_candidate.sql
-operations/warehouse_api.py
-operations/board_api.py
+operations/sql/003_attachments_candidate.sql
+operations/sql/004_workspace_context_candidate.sql
+operations/sql/005_command_resolution_candidate.sql
+operations/tests/attachments_pg_check.py
+operations/tests/board_http_pg_check.py
+operations/tests/board_pg_check.py
+operations/tests/command_resolution_pg_check.py
+operations/tests/test_attachment_store.py
 operations/tests/test_warehouse_pg.py
 operations/tests/warehouse_http_pg_check.py
-operations/tests/board_pg_check.py
-operations/tests/board_http_pg_check.py
-session/sql/00_roles.sql
-session/sql/01_session_core.sql
+operations/tests/workspace_pg_check.py
+operations/warehouse_api.py
+operations/workspace_api.py
 session/bff/__init__.py
 session/bff/models.py
 session/bff/repository.py
 session/bff/security.py
 session/requirements.lock
+session/sql/00_roles.sql
+session/sql/01_session_core.sql
 
-session source comes from the existing reviewed session package. All session imports
-are resolved from --session-sql-dir.parent by the runner. No Windows source path is
-embedded in the HTTP companions. Do not include LOCAL_PG.json, real runtime config,
-credentials, old database directories, encrypted identities, or application secrets.
+Install session/requirements.lock and operations/requirements-attachments.txt
+into the isolated reviewed runtime. No credentials or live runtime config.
 
-Linux invocation (operator supplies the reviewed Python environment):
 python -u -B operations/tests/test_warehouse_pg.py \
   --pg-bin /usr/lib/postgresql/17/bin \
   --session-sql-dir /absolute/bundle/session/sql \
   --output /short/new/private/path \
-  --http-check --board-http-check
+  --http-check --board-http-check --attachments-check --workspace-check --resolution-check
 
-Run under an unprivileged dedicated OS user (initdb rejects root). Output must not
-exist. Runner creates output and socket directory with mode0700; data directory is
-created by initdb. Linux uses ONLY that Unix socket, listen_addresses='', and checks
-inet_server_addr() IS NULL. There is no TCP listener and no public HTTP listener.
-Keep the output path short enough for Unix socket filenames (runner checks <100 bytes).
+Run as an unprivileged OS identity. Output must not exist. initdb creates a NEW
+warehouse_synthetic cluster; Linux uses a private0700 Unix socket, no TCP listener.
+No GREEN or other existing database connection. Runtime fsync remains on. Runner
+finally stops that exact cluster. Preserve evidence and inspect any unknown outcome
+before another attempt; do not overwrite an existing result directory.
 
-Windows default stays loopback127.0.0.1 on a fresh free port, executables with .exe.
-Linux executables have no .exe suffix. Runtime fsync must remain on and is asserted.
---fast-initdb is optional for disposable fixtures only: skips initdb final sync,
-never runtime fsync. Do not use it as evidence of crash durability.
+Run test_attachment_store.py separately on Linux for private permissions,
+symlink refusal, immutable publication and original-byte integrity.
+Windows-only coverage is reported as skipped on Linux, not as passed.
 
-The runner refuses an existing output directory, creates warehouse_synthetic in the
-NEW cluster, installs actual session-core SQL, warehouse and board candidate SQL,
-and seeds only synthetic identities, capabilities, categories and records. It does
-not connect to GREEN or any existing database. Finally it stops the same new cluster.
-
-Outputs: RESULT.json; HTTP_SQL_RESULT.json when --http-check;
-BOARD_SQL_RESULT.json and BOARD_HTTP_SQL_RESULT.json when --board-http-check.
-These verify application transactions/authorization, not production migration,
-physical crash durability, real login, real uploaded-file ownership or browser UI.
-
-Attachment verification in board_http_pg_check.py is an explicit synthetic registry.
-It is test-only. board_api.py has no default verifier: completion fails closed503
-without a trusted attachment-store dependency, and client hash/MIME fields are forbidden.
+Receipts: RESULT.json, HTTP_SQL_RESULT.json, BOARD_SQL_RESULT.json,
+BOARD_HTTP_SQL_RESULT.json, ATTACHMENTS_RESULT.json, WORKSPACE_HTTP_SQL_RESULT.json,
+COMMAND_RESOLUTION_RESULT.json. Tests cover real SQL, API and private files using
+synthetic identities. Real owner login and physical phone acceptance are separate.
+The old board-only HTTP suite uses an explicit synthetic attachment registry;
+the attachment suite supplies ActualAttachmentVerifier and real private files.

@@ -21,6 +21,7 @@ class WarehouseConflict(ServiceUnavailable):
     def __init__(self, code): self.code = code
 
 MESSAGES = {
+    'COMMAND_CANCELLED':'Цей запит скасовано. Для нової дії створіть новий запит.',
     'OPENING_UNKNOWN':'Спочатку підтвердьте початковий залишок.',
     'OPENING_ALREADY_KNOWN':'Початковий залишок уже зафіксовано.',
     'INSUFFICIENT_STOCK':'Недостатньо матеріалу для цієї операції.',

@@ -22,6 +22,7 @@ class BoardConflict(ServiceUnavailable):
     def __init__(self,code):self.code=code
 
 MESSAGES={
+ 'COMMAND_CANCELLED':'Цей запит скасовано. Для нової дії створіть новий запит.',
  'IDEMPOTENCY_CONFLICT':'Цей номер запиту вже використаний для іншої дії.',
  'STALE_TASK_VERSION':'Заявка вже змінилася. Оновіть її перед виконанням дії.',
  'CATEGORY_UNAVAILABLE':'Категорія робіт недоступна.',

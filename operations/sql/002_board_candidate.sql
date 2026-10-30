@@ -113,13 +113,14 @@ BEGIN
  IF NOT atlas_ops._board_has(s.user_id,p_facility,p_category,'board.create') OR NOT atlas_ops._board_has(s.user_id,p_facility,p_category,'board.read')
  THEN RAISE EXCEPTION 'BOARD_SCOPE_DENIED' USING ERRCODE='42501'; END IF;
  v_request:=jsonb_build_object('action','create','category_id',p_category,'title',p_title,'description',p_description,'private',p_private);
- PERFORM pg_advisory_xact_lock(hashtextextended('board:key:'||p_facility||':'||s.user_id||':'||p_key,0));
+ PERFORM atlas_ops._command_guard(p_facility,s.user_id,'board',p_key);
  SELECT * INTO prior FROM atlas_ops.board_command WHERE facility_id=p_facility AND actor_id=s.user_id AND idempotency_key=p_key;
  IF FOUND THEN
   IF prior.request IS DISTINCT FROM v_request THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT' USING ERRCODE='22023'; END IF;
   SELECT * INTO t FROM atlas_ops.board_task WHERE task_id=prior.task_id;
   PERFORM atlas_ops._board_require(s.user_id,t,'board.create');
-  PERFORM core._atlas_audit('board.replay',s.user_id,s.session_id,jsonb_build_object('task_id',t.task_id));RETURN prior.result;
+  PERFORM core._atlas_audit('board.replay',s.user_id,s.session_id,jsonb_build_object('task_id',t.task_id));
+  PERFORM atlas_ops._command_commit(p_facility,s.user_id,'board',p_key,v_request,prior.result,jsonb_build_object('task_id',t.task_id));RETURN prior.result;
  END IF;
  SELECT * INTO c FROM atlas_ops.board_category WHERE facility_id=p_facility AND category_id=p_category AND active FOR SHARE;
  IF NOT FOUND THEN RAISE EXCEPTION 'CATEGORY_UNAVAILABLE' USING ERRCODE='22023'; END IF;
@@ -135,6 +136,7 @@ BEGIN
  v_result:=to_jsonb(t);
  INSERT INTO atlas_ops.board_command(facility_id,actor_id,idempotency_key,task_id,request,result) VALUES(p_facility,s.user_id,p_key,t.task_id,v_request,v_result);
  PERFORM core._atlas_audit('board.create',s.user_id,s.session_id,jsonb_build_object('task_id',t.task_id,'event_id',v_event));
+ PERFORM atlas_ops._command_commit(p_facility,s.user_id,'board',p_key,v_request,v_result,jsonb_build_object('task_id',t.task_id));
  RETURN v_result;
 END $$;
 
@@ -156,13 +158,16 @@ BEGIN
  v_request:=jsonb_build_object('action',p_action,'task_id',p_task,'expected_version',p_expected_version,'assignee',p_assignee,
  'eta',p_eta,'reason',p_reason,'photo',p_photo,'confirmed',p_confirmed,'photo_sha256',p_photo_sha256,'photo_media_type',p_photo_media_type);
  v_cap:=CASE p_action WHEN 'assign' THEN 'board.assign' WHEN 'close' THEN 'board.review' ELSE 'board.execute' END;
- PERFORM pg_advisory_xact_lock(hashtextextended('board:key:'||p_facility||':'||s.user_id||':'||p_key,0));
+ -- Completion's attachment verifier already locks this same task. All transitions
+ -- acquire task before command-key to avoid a lock-order cycle on a conflicting retry.
  SELECT * INTO t FROM atlas_ops.board_task WHERE task_id=p_task AND facility_id=p_facility FOR UPDATE;
  PERFORM atlas_ops._board_require(s.user_id,t,v_cap);
+ PERFORM atlas_ops._command_guard(p_facility,s.user_id,'board',p_key);
  SELECT * INTO prior FROM atlas_ops.board_command WHERE facility_id=p_facility AND actor_id=s.user_id AND idempotency_key=p_key;
  IF FOUND THEN
   IF prior.request IS DISTINCT FROM v_request THEN RAISE EXCEPTION 'IDEMPOTENCY_CONFLICT' USING ERRCODE='22023'; END IF;
-  PERFORM core._atlas_audit('board.replay',s.user_id,s.session_id,jsonb_build_object('task_id',p_task));RETURN prior.result;
+  PERFORM core._atlas_audit('board.replay',s.user_id,s.session_id,jsonb_build_object('task_id',p_task));
+  PERFORM atlas_ops._command_commit(p_facility,s.user_id,'board',p_key,v_request,prior.result,jsonb_build_object('task_id',t.task_id));RETURN prior.result;
  END IF;
  IF t.version<>p_expected_version THEN RAISE EXCEPTION 'STALE_TASK_VERSION' USING ERRCODE='22023'; END IF;
  v_previous:=t.status;v_time:=clock_timestamp();
@@ -216,6 +221,7 @@ BEGIN
  v_result:=to_jsonb(t);
  INSERT INTO atlas_ops.board_command(facility_id,actor_id,idempotency_key,task_id,request,result) VALUES(p_facility,s.user_id,p_key,t.task_id,v_request,v_result);
  PERFORM core._atlas_audit('board.'||p_action,s.user_id,s.session_id,jsonb_build_object('task_id',t.task_id,'event_id',v_event,'task_version',t.version));
+ PERFORM atlas_ops._command_commit(p_facility,s.user_id,'board',p_key,v_request,v_result,jsonb_build_object('task_id',t.task_id));
  RETURN v_result;
 END $$;
 
