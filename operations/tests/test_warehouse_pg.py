@@ -4,7 +4,7 @@ Run with Python having psycopg, using --session-sql-dir to point to existing
 reviewed session/sql directory, and --output to a NEW directory outside repo.
 Only 127.0.0.1 and a freshly selected unused port are used. No real identities.
 """
-import argparse, hashlib, json, os, socket, subprocess, sys, uuid
+import argparse, hashlib, json, os, shlex, socket, subprocess, sys, uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
@@ -13,21 +13,33 @@ import psycopg
 
 SQL=Path(__file__).parents[1]/'sql/001_warehouse_candidate.sql'
 parser=argparse.ArgumentParser()
-parser.add_argument('--pg-bin',type=Path,default=Path('C:/Program Files/PostgreSQL/17/bin'))
+parser.add_argument('--pg-bin',type=Path,default=Path('C:/Program Files/PostgreSQL/17/bin' if os.name=='nt' else '/usr/lib/postgresql/17/bin'))
 parser.add_argument('--session-sql-dir',type=Path,required=True)
 parser.add_argument('--output',type=Path,required=True)
 parser.add_argument('--http-check',action='store_true',help='Also execute real HTTP to SQL BFF integration against this new synthetic cluster')
+parser.add_argument('--board-check',action='store_true',help='Also apply and test board candidate only in this new synthetic cluster')
+parser.add_argument('--board-http-check',action='store_true',help='Also run board HTTP to actual SQL integration; implies --board-check')
+parser.add_argument('--fast-initdb',action='store_true',help='Skip only initdb final sync for this disposable fixture; runtime fsync remains on')
 args=parser.parse_args()
 ROOT=args.output.resolve();DATA=ROOT/'data'
 if ROOT.exists():raise SystemExit('REFUSE_EXISTING_TEST_DIRECTORY')
-if not (args.pg_bin/'initdb.exe').is_file():raise SystemExit('PG17_UNAVAILABLE_TESTS_NOT_RUN')
-ROOT.mkdir(parents=True)
+def pgtool(name):return args.pg_bin/(name+('.exe' if os.name=='nt' else ''))
+if not pgtool('initdb').is_file():raise SystemExit('PG17_UNAVAILABLE_TESTS_NOT_RUN')
+ROOT.mkdir(parents=True,mode=0o700)
 def run(command):
     p=subprocess.run(list(map(str,command)),capture_output=True,timeout=90,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     if p.returncode:raise RuntimeError(p.stderr.decode(errors='replace')[-2000:])
     return p
-with socket.socket() as sock:sock.bind(('127.0.0.1',0));PORT=sock.getsockname()[1]
-CFG={'host':'127.0.0.1','port':PORT,'dbname':'warehouse_synthetic','user':'postgres','connect_timeout':3}
+if os.name=='nt':
+    with socket.socket() as sock:sock.bind(('127.0.0.1',0));PORT=sock.getsockname()[1]
+    HOST='127.0.0.1';PG_OPTIONS=f'-h 127.0.0.1 -p {PORT} -c shared_buffers=16MB -c max_connections=16'
+else:
+    SOCKET=ROOT/'socket'
+    if len(str(SOCKET/'.s.PGSQL.5432').encode())>=100:raise SystemExit('SYNTHETIC_SOCKET_PATH_TOO_LONG')
+    SOCKET.mkdir(mode=0o700)
+    HOST=str(SOCKET);PORT=5432
+    PG_OPTIONS=shlex.join(['-c','listen_addresses=','-k',str(SOCKET),'-p',str(PORT),'-c','shared_buffers=16MB','-c','max_connections=16'])
+CFG={'host':HOST,'port':PORT,'dbname':'warehouse_synthetic','user':'postgres','connect_timeout':3}
 results=[];started=False
 H=lambda s:hashlib.sha256(s.encode()).digest()
 def now():return datetime.now(timezone.utc)
@@ -71,15 +83,18 @@ def check(label,fn):fn();results.append({'test':label,'status':'PASS'});print('P
 def count():
     with admin() as c:return c.execute('SELECT (SELECT count(*) FROM atlas_ops.warehouse_operation),(SELECT count(*) FROM atlas_ops.warehouse_ledger)').fetchone()
 try:
-    run([args.pg_bin/'initdb.exe','-D',DATA,'-U','postgres','--encoding=UTF8','--locale=C','--auth=trust'])
+    run([pgtool('initdb'),'-D',DATA,'-U','postgres','--encoding=UTF8','--locale=C','--auth=trust']+(['--no-sync'] if args.fast_initdb else []))
     with (ROOT/'startup.log').open('wb') as stream:
-        subprocess.run([str(args.pg_bin/'pg_ctl.exe'),'-D',str(DATA),'-l',str(ROOT/'postgres.log'),'-o',f'-h 127.0.0.1 -p {PORT} -c shared_buffers=16MB -c max_connections=16','-w','start'],stdout=stream,stderr=stream,check=True,timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+        subprocess.run([str(pgtool('pg_ctl')),'-D',str(DATA),'-l',str(ROOT/'postgres.log'),'-o',PG_OPTIONS,'-w','start'],stdout=stream,stderr=stream,check=True,timeout=60,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
     started=True
     with psycopg.connect(**{**CFG,'dbname':'postgres'},autocommit=True) as c:
         assert Path(c.execute('SHOW data_directory').fetchone()[0]).resolve()==DATA
         c.execute('CREATE DATABASE warehouse_synthetic')
     with psycopg.connect(**CFG,autocommit=True) as c:
         assert c.execute('SHOW server_version_num').fetchone()[0].startswith('17')
+        assert c.execute('SHOW fsync').fetchone()[0]=='on'
+        assert c.execute('SHOW listen_addresses').fetchone()[0]==('127.0.0.1' if os.name=='nt' else '')
+        if os.name!='nt':assert c.execute('SELECT inet_server_addr()').fetchone()[0] is None
         c.execute('''CREATE ROLE vh_owner NOLOGIN NOSUPERUSER NOBYPASSRLS;
         GRANT CREATE ON DATABASE warehouse_synthetic TO vh_owner;
         CREATE SCHEMA core AUTHORIZATION vh_owner;CREATE SCHEMA ops AUTHORIZATION vh_owner;
@@ -187,7 +202,15 @@ try:
         sys.path.insert(0,str(Path(__file__).parent))
         from warehouse_http_pg_check import run_http_checks
         run_http_checks(CFG,ROOT,person,grant)
+    if args.board_check or args.board_http_check:
+        sys.path.insert(0,str(Path(__file__).parent))
+        from board_pg_check import run_board_checks
+        run_board_checks(CFG,ROOT,person,request)
+    if args.board_http_check:
+        sys.path.insert(0,str(args.session_sql_dir.parent))
+        from board_http_pg_check import run_board_http_checks
+        run_board_http_checks(CFG,ROOT,person)
     (ROOT/'RESULT.json').write_text(json.dumps({'status':'PASS_SYNTHETIC_PG17','tests':results,'sql_sha256':hashlib.sha256(SQL.read_bytes()).hexdigest(),'production_connected':False,'session_core':'actual 01_session_core.sql; synthetic sessions inserted by isolated fixture administrator','http_sql_integration_run':args.http_check,'not_tested':['browser acceptance','live migration','reservations','partial returns','arbitrary corrections']+([] if args.http_check else ['HTTP to SQL integration'])},indent=2),encoding='utf8')
 finally:
-    if started:run([args.pg_bin/'pg_ctl.exe','-D',DATA,'-m','fast','-w','stop'])
+    if started:run([pgtool('pg_ctl'),'-D',DATA,'-m','fast','-w','stop'])
 print('WAREHOUSE_SYNTHETIC_COMPLETE',len(results))

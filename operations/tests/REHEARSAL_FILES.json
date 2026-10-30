@@ -1,0 +1,67 @@
+{
+  "status": "PREPARED_NOT_EXECUTED_ON_LINUX",
+  "files": {
+    "operations/sql/001_warehouse_candidate.sql": {
+      "sha256": "81b82edec86153f21b8b101ba6dbec3075e98cc7918ccbca03ff7f59b2d61661",
+      "bytes": 19498
+    },
+    "operations/sql/002_board_candidate.sql": {
+      "sha256": "070e57c88219a4a77fbcc36ecb689a9a7bf9f2bad5207c8d1c67452709704403",
+      "bytes": 25171
+    },
+    "operations/warehouse_api.py": {
+      "sha256": "0845e613a36bb33aabbeefb83a33e37f0ffd60828ee0b7cf9b0233a43504a89e",
+      "bytes": 6496
+    },
+    "operations/board_api.py": {
+      "sha256": "2d9c27d3b637c77c6de26443b9a88da403d996947e3e380ca74cedde4e807fdc",
+      "bytes": 9739
+    },
+    "operations/tests/test_warehouse_pg.py": {
+      "sha256": "2c2c2e8a0a0ed39a71115f0b373679bf012bdb124f5f34e88e82596c7b966d4c",
+      "bytes": 16000
+    },
+    "operations/tests/warehouse_http_pg_check.py": {
+      "sha256": "20f73ec8b73ebda41c0a5f95a366523a0c60c506f8d28962bb27ea7a123d1a6c",
+      "bytes": 8712
+    },
+    "operations/tests/board_pg_check.py": {
+      "sha256": "c694b01d36c739a5f653d3cef7aba46dd1be1702e451ff169915dcab6f5aefb1",
+      "bytes": 16021
+    },
+    "operations/tests/board_http_pg_check.py": {
+      "sha256": "26e53222f07de9ea66fe287e6cda888000f603b634777ded458fa9c6a414d537",
+      "bytes": 12847
+    },
+    "session/sql/00_roles.sql": {
+      "sha256": "36d2d38918e6092fc167041abdd6624bd321a9d94740cb707f769d85acffdc9b",
+      "bytes": 396
+    },
+    "session/sql/01_session_core.sql": {
+      "sha256": "ec1b9e3316f81be460ed4ef6788a7ead7ffd9136d5757ec15f9f1d77b76408fc",
+      "bytes": 27294
+    },
+    "session/bff/__init__.py": {
+      "sha256": "e073aa821520d8aa482277b9f0c53885882022e2729ff6570e18c48dec90ed21",
+      "bytes": 85
+    },
+    "session/bff/models.py": {
+      "sha256": "2ee558f03d847e2fc0c7c48ac7440e04bd03fcb56a6439599d6b22d47194eb7f",
+      "bytes": 1879
+    },
+    "session/bff/repository.py": {
+      "sha256": "b332d882c1febc4e4dcede47244ef26229e2895b201f3595fb9fa2dabf673763",
+      "bytes": 7529
+    },
+    "session/bff/security.py": {
+      "sha256": "2c97bd939a3b17a1f2f8b4bdbc45fd764a66ce363025f50e096be4c7ad792842",
+      "bytes": 2787
+    },
+    "session/requirements.lock": {
+      "sha256": "43a99222e63e7134ebaa38b7633887af477f9c120cbc43bbf5c6f950128d3a17",
+      "bytes": 536
+    }
+  },
+  "syntax_check": "PASS",
+  "credential_files_included": false
+}
