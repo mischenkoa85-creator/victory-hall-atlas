@@ -1,0 +1,9 @@
+# Deployment manifests pin exact bytes, including line endings.
+index.html -text
+m/** -text
+d/** -text
+reports/** -text
+model-bindings/** -text
+operations/** -text
+tools/*.cjs text eol=lf
+tools/*.py text eol=lf

@@ -6654,7 +6654,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     h += '<div class="xact two"><button type="button" data-det="print">Відомість: друк або PDF</button><button type="button" data-det="copy">Скопіювати текстом</button></div>';
     h += '<p class="note">Позначки огляду зберігаються лише на цьому пристрої, інші люди їх не бачать. Щоб передати результат — роздрукуйте відомість, збережіть її як PDF або скопіюйте текстом. Без позначок відомість друкується як порожній бланк для обходу.</p>';
     h += '<p class="note">' + esc(DOORS.note) + '</p>';
-    h += '<p class="note">На цоколі й 2–4-му поверхах двері в моделі стоять за техпаспортом 2021 року: місця на стінах, бік завіс і бік відчинення умовні, марки — за планами проєкту. Рядки «немає в АР» — двері, які є в техпаспорті, але не в проєкті; доводчика на моделі для них не показано. Двері комор і вхідні двері квартир належать власникам і сюди не входять. Усі марки й розміри — у довіднику «Типи дверей за проєктом».</p>';
+    h += '<p class="note">На цоколі й 2–4-му поверхах двері в моделі стоять за техпаспортом 2021 року: місця на стінах, бік завіс і бік відчинення умовні, марки — за планами проєкту. Рядки «немає в АР» — двері, які є в техпаспорті, але не в проєкті; доводчика на моделі для них не показано. Двері комор включені до огляду. Вхідні двері квартир у цьому переліку не наведені. Усі марки й розміри — у довіднику «Типи дверей за проєктом».</p>';
     h += ckAsk ? '<div class="xact"><span class="ask">Очистити всі позначки огляду?</span><button type="button" data-det="clear2">Так, очистити</button><button type="button" data-det="clear0">Ні</button></div>'
       : '<div class="xact">' + (all.done ? '<button type="button" data-det="clear">Очистити позначки</button>' : '') + '<button type="button" data-det="close">Закрити</button></div>';
     p.innerHTML = h; p.hidden = false; p.scrollTop = keep; detMini = false; syncUI();
@@ -8176,4 +8176,5 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 })();
 </script>
 <script src="reports/panel.js" data-reporting-base="https://srv1208299.hstgr.cloud/block8-reporting/v1/reports/" defer></script>
+<script src="operations/navigation.js" defer></script>
 </body></html>
