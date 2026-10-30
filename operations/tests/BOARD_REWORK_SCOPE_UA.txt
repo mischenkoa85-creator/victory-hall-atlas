@@ -1,0 +1,45 @@
+BOARD REWORK — ЗАСТОСОВАНО ЧЕРЕЗ МІГРАЦІЮ0121,31.10.2026
+Підсумок фактичних перевірок: BOARD_REWORK_ACCEPTANCE.json.
+
+API action: return_for_rework (той самий POST tasks/{task}/transitions).
+Поля: idempotency_key, expected_version, action, reason.
+Actor/role/reviewer/version звіту із HTTP не приймаються.
+
+SQL006 змінює лише існуючі board_transition, board_task_get, board_task_list та
+додає приватний readonly helper _board_rework_view. Таблиці й GRANT реальним
+користувачам не змінюються. Frozen SQL001–005 не редагуються.
+
+Повернення: лише записаний reviewer із board.review, лише reported_done із
+review_required=true, без самоприймання. Пояснення обов'язкове.
+Результат: status=assigned, display_state=returned_for_rework,
+last_action=return_for_rework, ETA=NULL, старий assignee лишається.
+Reviewer може перепризначити, worker повинен знову натиснути accept.
+Після accept status/display_state=in_progress; reason повернення доступний
+у rework_reason/rework_requested_at/rework_request_version та в історії.
+
+Результат читається за тією самою scope/privacy перевіркою. Helper не має PUBLIC
+або reader EXECUTE. Він читає події лише до task.version; новіші concurrent events
+не домішуються до старішого snapshot рядка. VOLATILE потрібен для видимості
+щойно вставленої події у відповіді write-функції.
+
+Report version не зменшується. Report/photo записи лишаються immutable.
+Наступний report_done після повернення потребує completion attachment цього
+worker/task, завантаженого ПІСЛЯ останнього rework event. Old reference не приймається.
+Це доводить час нового завантаження, а не час знімання або фізичне виконання роботи.
+Повтор уже COMMITTED старого report_done із тим самим ключем повертає стару
+квитанцію до freshness guard, тому idempotency не ламається.
+
+Один event/command/audit; три окремі outbox audience: assignee, creator, administrator.
+Жодних email/Telegram/push відправлень. SQL transaction, optimistic version,
+durable cancellation та ідемпотентність використані без зміни протоколу.
+
+Перевірки:
+test_board_rework_api.py —8 HTTP contract tests із fake repository, без БД, PASS.
+Запуск через pytest; на sys.path потрібен перевірений session-пакет із bff/.
+test_board_rework_restored.py —6 груп реального HTTP→SQL→private photos тесту, PASS.
+Він створює тільки нову atlas_ops_rework_fixture_20261030 через TEMPLATE
+victory_hall_green_dev на приватному clone7702557112009102907/socket56594.
+Код не підключається до source55435: ціль жорстко задана як приватний клон.
+Caller запускає/зупиняє клон.
+БД/фото зберігаються як evidence, нічого не видаляється; template functions
+звіряються до/після. Root виконав server test після незалежного review; клон зупинено.

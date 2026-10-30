@@ -1,0 +1,20 @@
+{
+  "status": "LOCAL_REWORK_CANDIDATE",
+  "http_contract_tests": {
+    "passed": 8,
+    "repository": "synthetic fake; actual cookie/Origin/CSRF functions"
+  },
+  "sql_runtime_test": "PREPARED_FOR_ROOT_PRIVATE_CLONE_NOT_EXECUTED_BY_THIS_AGENT",
+  "sql_generation": "exact pinned002 deterministic",
+  "frozen_sql001_to005_modified": false,
+  "server_execution": false,
+  "real_grants_added": false,
+  "notifications_sent": 0,
+  "files": {
+    "sql/006_board_rework_candidate.sql": "dca4503b70d11d6029559bccc3203160da3e3c36ce580f2884d7e3d75db0e397",
+    "board_api.py": "177b0d0daf565d0ed2ff3370df78a00b504deb696ca76c105ee07d7985046de6",
+    "tests/test_board_rework_restored.py": "e1908ff4038202cc914e4d2689b8933f6c9032cccde2b2f66336337ba8435f45",
+    "tests/test_board_rework_api.py": "2af30e27c9b0d7adabbf1bb1a6246b664f6841ab0c46cd056641c9e4b7f4842b",
+    "tests/build_board_rework_candidate.py": "5c02421bbb55c3c5e41abc4a33c41163d66c895600d4d4715c1b5e8bbacb17fe"
+  }
+}

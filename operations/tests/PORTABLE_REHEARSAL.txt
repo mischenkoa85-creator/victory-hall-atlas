@@ -2,6 +2,9 @@ PORTABLE SYNTHETIC WAREHOUSE / BOARD / PHOTO / COMMAND REHEARSAL
 
 Actual Linux R2 execution: PASS; private Unix-only cluster stopped.
 Exact-byte dependency manifest: REHEARSAL_FILES.json (27 files).
+This is the frozen baseline at commit62f588d8f49276753cfcaa928afdbabb07f87239.
+Extract operations files from that commit, not a later working tree. Rework has
+separate current-source tests and BOARD_REWORK_ACCEPTANCE.json.
 Files prefixed session/ are external reviewed session-core dependencies supplied
 by the operator. This synthetic core is not claimed to be the current production
 BFF; operations/integration separately checks the current assembled BFF on a

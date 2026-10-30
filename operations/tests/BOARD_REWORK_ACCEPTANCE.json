@@ -1,0 +1,35 @@
+{
+  "status": "DEPLOYED_AND_VERIFIED",
+  "date": "2026-10-31",
+  "source_sql_sha256": "dca4503b70d11d6029559bccc3203160da3e3c36ce580f2884d7e3d75db0e397",
+  "api_sha256": "177b0d0daf565d0ed2ff3370df78a00b504deb696ca76c105ee07d7985046de6",
+  "workspace_sha256": "ccd1bb39720e42cd6fe4cfc5375895401d9edbe30cfba7559124a9630a1e911d",
+  "migration": "0121_atlas_board_rework_20261031",
+  "migration_checksum": "4ad2dcab8da686aa1c76effd35fb5d66ebb720818031650f4d2c844b0667414f",
+  "schema_fingerprint": "b086b25f0760c4f75f807e9f1036a2ac20b0fc1983183185c0334f97ec167bda",
+  "checks": {
+    "local_http_contract_tests": 8,
+    "full_assembly_regression_tests": 8,
+    "actual_pg_http_private_photo_groups": 6,
+    "fresh_backup_restore_amcheck": "PASS",
+    "migration_rollback_commit_readback_noop": "PASS",
+    "synthetic_browser_rework_retry_reaccept_upload_review": "PASS",
+    "mobile_390x844_horizontal_overflow": false,
+    "private_dom_cleared_after_authentication_loss": true,
+    "public_files_verified": 77,
+    "encrypted_assets_unchanged": 23,
+    "native_service_prerequisites": "PASS",
+    "public_anonymous_private_routes": "401",
+    "owner_browser_sso_and_workspace_access": "PASS",
+    "physical_phone": "NOT_TESTED"
+  },
+  "data_boundary": {
+    "production_test_tasks_or_stock_created": false,
+    "new_people_or_grants": false,
+    "external_notifications_sent": false,
+    "photo_rule": "Requires a new uploaded attachment reference after return, not proof of physical capture time; identical bytes may be uploaded again.",
+    "september_report": "Loads1893 source records;12 disputed records and unconfirmed mappings remain flagged. Numerical/source reconciliation is not claimed."
+  },
+  "private_receipt_directory": "D:/GPT/work/atlas-workflow-20261030",
+  "independent_release_reviewer": "/root/rework_release_review"
+}

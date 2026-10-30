@@ -113,5 +113,7 @@
   "receipt_sha256": "bbf0b3efdf6cf74b47ad23b37cb504e1ed22cfad53ae4564fcb4aa03efc24e61",
   "cluster_stopped": true,
   "credential_files_included": false,
-  "scope": "New synthetic cluster only; current BFF and restored GREEN clone have separate integration receipts."
+  "scope": "New synthetic cluster only; current BFF and restored GREEN clone have separate integration receipts.",
+  "source_commit": "62f588d8f49276753cfcaa928afdbabb07f87239",
+  "snapshot_scope": "Frozen Linux R2 baseline; extract operations files from source_commit. Current rework code is covered separately by BOARD_REWORK_ACCEPTANCE.json."
 }

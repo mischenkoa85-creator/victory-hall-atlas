@@ -35,6 +35,9 @@ MESSAGES={
  'COMPLETION_REQUIRES_PHOTO_AND_CONFIRMATION':'Додайте фото й підтвердьте виконання.',
  'COMPLETION_REQUIRES_VERIFIED_PHOTO':'Потрібне перевірене фото виконаної роботи.',
  'REVIEW_TRANSITION_DENIED':'Заявка ще не готова до приймання.',
+ 'REWORK_TRANSITION_DENIED':'Повернути на доопрацювання можна лише роботу, яка очікує приймання.',
+ 'REWORK_REASON_REQUIRED':'Поясніть, що потрібно доопрацювати.',
+ 'REWORK_REQUIRES_FRESH_PHOTO':'Додайте фото, завантажене після останнього повернення на доопрацювання.',
  'LIST_LIMIT_INVALID':'Неправильний розмір сторінки.',
  'LIST_CURSOR_INVALID':'Неправильний курсор сторінки.',
  'UNEXPECTED_ACTION_FIELDS':'Перевірте поля вибраної дії.',
@@ -64,7 +67,7 @@ class CreateTask(Command):
 class Transition(Command):
     idempotency_key:str=Field(min_length=1,max_length=128)
     expected_version:int=Field(strict=True,ge=1,le=2147483647)
-    action:Literal['assign','accept','decline','eta','report_done','close']
+    action:Literal['assign','accept','decline','eta','report_done','close','return_for_rework']
     assignee_id:UUID|None=None
     estimated_completion_at:AwareDatetime|None=None
     reason:str|None=Field(default=None,max_length=2000)
