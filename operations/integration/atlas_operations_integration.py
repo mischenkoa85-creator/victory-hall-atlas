@@ -19,7 +19,7 @@ PHOTO_BODY_LIMIT=5*1024*1024
 _UUID=r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}'
 _UPLOAD=re.compile(r'/v1/session/attachments/'+_UUID+r'/tasks/'+_UUID)
 _MEDIA={'image/jpeg','image/png','image/webp'}
-_PREFIXES=('/v1/session/warehouse/','/v1/session/board/','/v1/session/attachments/','/v1/session/operations/')
+_PREFIXES=('/v1/session/warehouse/','/v1/session/board/','/v1/session/attachments/','/v1/session/operations/','/v1/session/power/')
 
 def _route_path(scope):
     path=scope.get('path','')
@@ -104,6 +104,8 @@ def attach_operations(app,repository,*,store=None,notification_runtime=None):
     _module('board_api').attach_board(app,repository,attachment_verifier=storage.ActualAttachmentVerifier(store))
     _module('attachment_api').attach_attachments(app,repository,store)
     _module('workspace_api').attach_workspace(app,repository)
+    _module('atlas_power_projection')
+    _module('power_api').attach_power(app,repository)
     _module('command_resolution_api').attach_command_resolution(app,repository)
     _module('staff_team_api').attach_staff_teams(app,repository)
     _module('warehouse_extensions_api').attach_warehouse_extensions(app,repository)
