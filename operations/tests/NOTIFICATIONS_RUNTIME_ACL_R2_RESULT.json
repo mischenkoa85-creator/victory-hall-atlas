@@ -1,0 +1,57 @@
+{
+  "files_sha256": {
+    "integration/NOTIFICATIONS_PROVISIONING_UA.txt": "245672b1acea3ca805028d26391af810e6199622859f3cdfe7753d6fba546f95",
+    "integration/notification-bff-credentials.conf.template": "1aa1f42f2246991f627df65b00ae962d7210c06ff92b10f5f71c1b792e47894d",
+    "integration/notification-worker.service.template": "5007665e0cd0308b9525cdd797a9cb48cbed6a025b69719e0c2ccd27f8b00f05",
+    "notification-sw.js": "2ad901bd0684746d426644afc7dc153fdecc901499f1579d3e331de4ceef3547",
+    "notification_api.py": "b867c1006a02cc9c2f74a4b08365087369305b78720d2466b085f8d36676a84b",
+    "notification_client.js": "11dc45f3b0fb3b70129396cd4c74770246e065a8e51d59b10158d39e38ce37d9",
+    "notification_crypto.py": "ae8ef6b53369f78ba54bf6582f7769a1467321ce11baa10f9e074291eed020a0",
+    "notification_runtime.py": "e0ac379bdb0e080c06f77b4a0acc4efe9a19d8da2c31f765e285e249dc28e605",
+    "notification_worker.py": "3e837b9db208b91299a5b03d1f3b14d20ccfc85e75ab4f576aaf15854be9c27a",
+    "notification_worker_main.py": "83357c0e710ad9248852628d9420e1cf64ec132adeb4eb4c7012bbc7c70b9d5e",
+    "requirements-notifications-lock.txt": "6af3695e034f724825aebc0d0b56b59d2cd9a0ee235c3e18517933d2126c4221",
+    "requirements-notifications.txt": "cba99541ec3c95efde0182d850f213a96229dba7f09b47f64afb44e97a93c29c",
+    "sql/008_notification_channels_candidate.sql": "26f79853aea18a67a2a8cb585e41acead8130b5b5ed7899ab249b1a5edeefc0b",
+    "sql/NOTIFICATIONS_README_UA.txt": "183241eed752c2c87e95afc192cc6c4b4a12a649252c2c0c78f615a0e3b188c3",
+    "tests/notification_pg_check.py": "ed68a390ff77d2055c898573d32e47a2866f85a5acac839257c4c8e3d052dc3c",
+    "tests/test_notification_client.mjs": "2212bd504db47b2c9683a8339d9c108115ce7519862b5dff3e325d4774027ba5",
+    "tests/test_notification_runtime.py": "b0cc548e170a81c0114cfa87291f05b4d9c98a90ba456f1e2bc997882e46424f",
+    "tests/test_notification_runtime_acl.py": "03173ca53db889e2153a63cef0d8adc198f630c6c03060155a0d91c010c6305f",
+    "tests/test_notifications.py": "e17346fed871ed0694cd62998d12986d564a5eebf629579e7ecebf6b1c699a45"
+  },
+  "native_credential_values_read_by_agent": false,
+  "native_metadata_evidence": {
+    "credential_values_read": false,
+    "directory_mode": "0550",
+    "exact_service_uid_acl": 986,
+    "file_mode": "0440",
+    "path": "D:/GPT/work/atlas-workforce-20261031/credential-metadata.json",
+    "provided_by": "root",
+    "readonly": true,
+    "sha256": "3819a474f0c344f327b3f0876f525f2bb5fe2d0b2f4ac02ec85d6cf09b10b3e8"
+  },
+  "native_r2_factory_acceptance": "PENDING_ROOT",
+  "native_script_executed_by_agent": false,
+  "pinned_algorithm_source_sha256": "43e5d3b65a6e331c210e7ddf51188e64ab9dff386db9b79259b980d2a46fde12",
+  "predecessor_receipt_sha256": "6968cff778c67a436df0d080eff64d364ec72ed3f354215a831f94bbae60229f",
+  "status": "PASS_LOCAL_RUNTIME_ACL_R2_WITH_NATIVE_ACTIVATION_PENDING",
+  "supersedes_runtime_hash_only": "2c4f31419d71111761b138f81ddce9bae4783e3a43dcdbcb8c12857bedbf00d0",
+  "tests": {
+    "covers": [
+      "Exact systemd ACL mask accepted",
+      "No-ACL current-owner0400 accepted on readonly mount",
+      "Plain0440/outsider/wronguid/group/other ACL denied",
+      "Writable mount and directory/file inode swap denied",
+      "Nonregular, hardlink, oversize and wrongprocess denied",
+      "BFF cannot read worker private credential"
+    ],
+    "new_synthetic_acl_passed": 26,
+    "prior_runtime_passed": 8,
+    "total_passed": 34,
+    "uids": [
+      986,
+      982
+    ]
+  }
+}

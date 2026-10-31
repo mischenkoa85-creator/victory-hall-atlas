@@ -1,0 +1,65 @@
+{
+  "status": "PASS_LOCAL_AND_RESTORED_CLONE_WIRING",
+  "candidate": "bff-integration-candidate-3",
+  "local_code_only": {
+    "tests": 8,
+    "status": "PASS",
+    "db_or_network_access": false,
+    "credentials_or_env_read": false
+  },
+  "restored_clone": {
+    "receipt_file": "restored-bff-test-result.json",
+    "receipt_sha256": "e58d71d3327193e56c72e8dad525ab05807d1886d6f12d8b247a7d911a8e2de2",
+    "status": "PASS_RESTORED_FULL_BFF",
+    "cases": [
+      {
+        "test": "actual restored low-privilege login roles and shared native BFF session",
+        "status": "PASS"
+      },
+      {
+        "test": "warehouse commits and same-key retry; durable cancellation on full BFF",
+        "status": "PASS"
+      },
+      {
+        "test": "board and >32KiB actual PNG upload/proof/download through full middleware",
+        "status": "PASS"
+      },
+      {
+        "test": "chunked operations JSON is bounded before parser",
+        "status": "PASS"
+      }
+    ],
+    "routes": 32,
+    "pillow_version": "13.0.0",
+    "fixture_database": "atlas_ops_bff_fixture_20261030",
+    "original_restored_database_unchanged": true,
+    "clone_stopped": true,
+    "source_connected": false,
+    "protected_runtime_called": false,
+    "synthetic_identities": true
+  },
+  "native_service_readback": {
+    "receipt_file": "service-activation-result.json",
+    "status": "PASS_OPERATIONS_BFF_ACTIVE",
+    "unit_sha256": "1b6cd667e7b449dbcf9998c86fd972c353053722b94e48153ea541a4571bad6c",
+    "native_prerequisites_passed": true,
+    "anonymous_401_routes": 6
+  },
+  "photo_root": "/var/lib/victory-hall-atlas-attachments",
+  "files": {
+    "session/service-candidate/assembly.py": {
+      "sha256": "09abe7aa8aabd0084a69da51371542a733c1b614c513e38b3ccc63c0af7ce2b9",
+      "bytes": 12053
+    },
+    "session/bff/app.py": {
+      "sha256": "1539bdb42b287d38514797fbdd69d6bbaffd268fdb371f7d13ea731b5c7b4507",
+      "bytes": 17619
+    },
+    "session/service-candidate/atlas_operations_integration.py": {
+      "sha256": "cecd5579316cf4923dcb1a20e71c306bf596bd34f3d09db72caf67a03554d6c8",
+      "bytes": 5624
+    }
+  },
+  "owner_browser_login_verified": false,
+  "physical_phone_acceptance_verified": false
+}

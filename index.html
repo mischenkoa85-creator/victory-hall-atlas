@@ -6654,7 +6654,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     h += '<div class="xact two"><button type="button" data-det="print">Відомість: друк або PDF</button><button type="button" data-det="copy">Скопіювати текстом</button></div>';
     h += '<p class="note">Позначки огляду зберігаються лише на цьому пристрої, інші люди їх не бачать. Щоб передати результат — роздрукуйте відомість, збережіть її як PDF або скопіюйте текстом. Без позначок відомість друкується як порожній бланк для обходу.</p>';
     h += '<p class="note">' + esc(DOORS.note) + '</p>';
-    h += '<p class="note">На цоколі й 2–4-му поверхах двері в моделі стоять за техпаспортом 2021 року: місця на стінах, бік завіс і бік відчинення умовні, марки — за планами проєкту. Рядки «немає в АР» — двері, які є в техпаспорті, але не в проєкті; доводчика на моделі для них не показано. Двері комор і вхідні двері квартир належать власникам і сюди не входять. Усі марки й розміри — у довіднику «Типи дверей за проєктом».</p>';
+    h += '<p class="note">На цоколі й 2–4-му поверхах двері в моделі стоять за техпаспортом 2021 року: місця на стінах, бік завіс і бік відчинення умовні, марки — за планами проєкту. Рядки «немає в АР» — двері, які є в техпаспорті, але не в проєкті; доводчика на моделі для них не показано. Двері комор включені до огляду. Вхідні двері квартир у цьому переліку не наведені. Усі марки й розміри — у довіднику «Типи дверей за проєктом».</p>';
     h += ckAsk ? '<div class="xact"><span class="ask">Очистити всі позначки огляду?</span><button type="button" data-det="clear2">Так, очистити</button><button type="button" data-det="clear0">Ні</button></div>'
       : '<div class="xact">' + (all.done ? '<button type="button" data-det="clear">Очистити позначки</button>' : '') + '<button type="button" data-det="close">Закрити</button></div>';
     p.innerHTML = h; p.hidden = false; p.scrollTop = keep; detMini = false; syncUI();
@@ -8026,19 +8026,42 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 })();
 </script>
 <script>
-/* Атлас: живлення будинку (крок 5, 21.10.2026) — віконце «блискавка і сонце», видно всім.
-   Мережа: є / «Відсутня мережа» з часом без мережі / «Немає даних» (сіре — коли дані не надходять: це не те саме, що вимкнення світла).
-   Сонце: генерація є — сонце мʼяко блимає і кВт; вдень мало генерації — сонце за хмаркою; ніч — маленький місяць (день чи ніч — з розрахунку Сонця на сторінці).
-   Дані — з адреси стану на сервері (POWER_URL), коли її підключать; паролів і ключів Deye на сторінці немає.
-   Поки адреси немає, віконце чесно показує «Немає даних». Показ станів для перевірки: ?power=demo.
+/* Атлас: живлення будинку (крок 5) — захищений стан Deye, 31.10.2026.
+   Стан мережі визначає лише підтверджений серверний grid. Втрата даних не означає вимкнення.
+   Обидва часові поля й source мають підтверджувати свіжість; відсутній час не замінюємо поточним.
+   Сонце/хмара/місяць використовують серверний pv; час доби лише оформлює підтверджений ZERO.
    Налаштування (показувати віконце, цифри, блимання) зберігаються лише на цьому пристрої. */
 (function () {
   'use strict';
-  var POWER_URL = null;          // напр. 'https://srv1208299.hstgr.cloud/block8-reporting/v1/energy/status' — коли адміністратор VPS її відкриє
+  var POWER_URL = '/block8-reporting/v1/session/power/7faea0c2-6f17-8c3c-88b5-77858aa65072';
   var POLL_MS = 10000;           // як часто питати стан, поки сторінка на екрані
-  var STALE_MS = 60000;          // дані старші — «Немає даних»
-  var GEN_KW = 0.3;              // поріг «генерація є», кВт (уточнити за справжніми даними; станція 42,3 кВт)
+  var STALE_MS = 15000;          // верхня межа свіжості чинного Deye live-state
   var LS = 'atlas-power-v1';
+  function instant(value) {
+    if (typeof value !== 'string') return null;
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/.exec(value);
+    if (!m || +m[2] < 1 || +m[2] > 12 || +m[3] < 1 || +m[3] > new Date(Date.UTC(+m[1], +m[2], 0)).getUTCDate() || +m[4] > 23 || +m[5] > 59 || +m[6] > 59) return null;
+    var t = Date.parse(value); return Number.isFinite(t) ? t : null;
+  }
+  function powerNumber(value) {
+    if (typeof value !== 'number' && !(typeof value === 'string' && /^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(value))) return null;
+    var n = Number(value); return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  function adaptPower(j) {
+    if (!j || typeof j !== 'object' || Array.isArray(j) || !/^(FRESH|STALE|OFFLINE|UNKNOWN)$/.test(j.source) || !/^(PRESENT|ABSENT|UNKNOWN)$/.test(j.grid) || !/^(GENERATING|ZERO|UNKNOWN)$/.test(j.pv)) return null;
+    var updated = instant(j.last_observed_at), received = instant(j.last_received_at), since = instant(j.grid_absent_since);
+    return { grid: j.grid === 'PRESENT' ? 'on' : j.grid === 'ABSENT' ? 'off' : 'unknown', pv: j.pv,
+      since: j.grid === 'ABSENT' && j.grid_time_quality === 'CONFIRMED' && since != null && updated != null && since <= updated ? since : null,
+      kw: powerNumber(j.pv_power_kw), updated: updated, received: received, source: j.source,
+      staleMs: typeof j.freshness_s === 'number' && j.freshness_s > 0 ? Math.min(STALE_MS, j.freshness_s * 1000) : STALE_MS };
+  }
+  function powerView(state, request, now, daylight) {
+    var stale = request !== 'ok' || state.source !== 'FRESH' || state.updated == null || state.received == null ||
+      now < state.updated || now < state.received || now - state.updated >= state.staleMs || now - state.received >= state.staleMs;
+    return { grid: stale ? 'unknown' : state.grid,
+      pv: stale ? 'unknown' : state.pv === 'GENERATING' ? 'gen' : state.pv === 'ZERO' ? (daylight ? 'cloud' : 'night') : 'unknown',
+      kw: stale ? null : state.kw, since: stale ? null : state.since, stale: stale };
+  }
   function ready(fn) { if (window.P00 && window.P00.ready && window.__A3 && window.P00.ui && document.getElementById('skypill')) fn(); else setTimeout(function () { ready(fn); }, 250); }
   ready(function () {
     var $ = function (id) { return document.getElementById(id); };
@@ -8075,50 +8098,63 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     var sky = $('skypill'); sky.parentNode.insertBefore(pill, sky.nextSibling); document.body.appendChild(panel);
 
     /* стан */
-    var S = { grid: 'unknown', since: null, kw: null, today: null, soc: null, outages: null, updated: null, source: POWER_URL ? 'server' : 'none' };
-    var fmtT = function (t) { var d = new Date(t); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); };
+    function emptyState() { return { grid: 'unknown', pv: 'UNKNOWN', since: null, kw: null, updated: null, received: null, source: 'UNKNOWN', staleMs: STALE_MS }; }
+    var S = emptyState(), request = 'pending', inFlight = false, panelRenderKey = null, pillRenderHTML = null;
+    var fmtT = function (t) { return new Date(t).toLocaleString('uk-UA'); };
     var dur = function (ms) { var m = Math.max(0, Math.round(ms / 60000)); return m < 60 ? m + ' хв' : Math.floor(m / 60) + ' год ' + (m % 60) + ' хв'; };
     var num = function (x, d) { return x == null ? '—' : (+x).toFixed(d).replace('.', ','); };
     function day() { try { var st = window.P00.sky && window.P00.sky.state && window.P00.sky.state(); var a = st && (st.sun ? st.sun.alt : st.sunAlt); if (typeof a === 'number') return a > -2; } catch (e) {} var h = new Date().getHours(); return h >= 7 && h < 19; }
     function view() {
-      var stale = !S.updated || Date.now() - S.updated > STALE_MS;
-      var grid = stale ? 'unknown' : S.grid;
-      var pv = stale || S.kw == null ? 'unknown' : (S.kw >= GEN_KW ? 'gen' : (day() ? 'cloud' : 'night'));
-      if (!stale && pv === 'unknown' && !day()) pv = 'night';
-      return { grid: grid, pv: pv, stale: stale };
+      return powerView(S, request, Date.now(), day());
+    }
+    function statusText(v) {
+      if (request === 'login') return 'Увійдіть, щоб переглянути стан живлення.';
+      if (request === 'forbidden') return 'Ваш обліковий запис не має доступу до стану живлення.';
+      if (request === 'network') return 'Не вдалося з’єднатися із сервером. Стан мережі невідомий.';
+      if (request === 'unavailable') return 'Сервіс стану живлення тимчасово недоступний.';
+      if (request === 'invalid') return 'Сервер повернув непридатні дані стану живлення.';
+      if (request === 'pending') return 'Завантаження стану живлення…';
+      if (S.source === 'OFFLINE') return 'Джерело телеметрії не передає актуальні дані. Це не підтверджує вимкнення електрики.';
+      if (v.stale) return 'Немає свіжих даних із підтвердженим часом. Стан мережі невідомий.';
+      return v.grid === 'unknown' ? 'Телеметрія надходить. Стан мережі не підтверджено джерелом.' : 'Актуальні дані джерела телеметрії.';
     }
     function render() {
       var v = view();
       pill.hidden = !opts.show;
       pill.className = v.grid === 'off' ? 'off' : v.grid === 'unknown' ? 'unk' : '';
       var g = v.grid === 'on' ? '<span class="it g">' + I.bolt('#e2a400') + 'Мережа є</span>'
-        : v.grid === 'off' ? '<span class="it g">' + I.boltOff + 'Відсутня мережа' + (S.since ? ' <small>' + dur(Date.now() - S.since) + '</small>' : '') + '</span>'
-        : '<span class="it g">' + I.bolt('#b5bcc8') + 'Немає даних' + (S.updated ? ' <small>з ' + fmtT(S.updated) + '</small>' : '') + '</span>';
+        : v.grid === 'off' ? '<span class="it g">' + I.boltOff + 'Відсутня мережа' + (v.since != null ? ' <small>' + dur(Date.now() - v.since) + '</small>' : '') + '</span>'
+        : '<span class="it g">' + I.bolt('#b5bcc8') + (request === 'login' ? 'Потрібен вхід' : request === 'forbidden' ? 'Доступ обмежено' : !v.stale ? 'Мережа невідома <small>дані свіжі</small>' : 'Немає даних') + '</span>';
       var p = '';
-      if (v.pv === 'gen') p = '<span class="it"><span class="' + (opts.blink ? 'blink' : '') + '">' + I.sun('#f2b705') + '</span>' + (opts.nums ? num(S.kw, 1) + ' кВт' : '') + '</span>';
-      else if (v.pv === 'cloud') p = '<span class="it">' + I.cloud + (opts.nums && S.kw != null ? num(S.kw, 1) + ' кВт' : '') + '</span>';
+      if (v.pv === 'gen') p = '<span class="it"><span class="' + (opts.blink ? 'blink' : '') + '">' + I.sun('#f2b705') + '</span>' + (opts.nums && v.kw != null ? num(v.kw, 1) + ' кВт' : '') + '</span>';
+      else if (v.pv === 'cloud') p = '<span class="it">' + I.cloud + (opts.nums && v.kw != null ? num(v.kw, 1) + ' кВт' : '') + '</span>';
       else if (v.pv === 'night') p = '<span class="it">' + I.moon + '<small>ніч</small></span>';
-      pill.innerHTML = g + p;
+      else if (v.kw != null) p = '<span class="it">' + I.sun('#b5bcc8') + (opts.nums ? num(v.kw, 1) + ' кВт' : '') + '</span>';
+      if (pillRenderHTML !== g + p) { pillRenderHTML = g + p; pill.innerHTML = pillRenderHTML; }
+      pill.title = statusText(v);
       pill.setAttribute('aria-label', 'Живлення будинку: ' + pill.textContent.trim());
       if (!panel.hidden) renderPanel(v);
       place();
     }
     function renderPanel(v) {
       v = v || view();
-      var gridTxt = v.grid === 'on' ? 'є' + (S.since ? ' з ' + fmtT(S.since) : '') : v.grid === 'off' ? 'відсутня' + (S.since ? ' з ' + fmtT(S.since) + ' (' + dur(Date.now() - S.since) + ')' : '') : 'немає даних';
-      var pvTxt = v.pv === 'gen' ? num(S.kw, 1) + ' кВт' : v.pv === 'cloud' ? 'мало сонця' + (S.kw != null ? ', ' + num(S.kw, 1) + ' кВт' : '') : v.pv === 'night' ? 'ніч' : 'немає даних';
+      var key = JSON.stringify([S, request, v, opts, Math.floor(Date.now() / 60000)]);
+      if (key === panelRenderKey) return;
+      panelRenderKey = key;
+      var gridTxt = v.grid === 'on' ? 'є' : v.grid === 'off' ? 'відсутня' + (v.since != null ? ' з ' + fmtT(v.since) + ' (' + dur(Date.now() - v.since) + ')' : '; час початку не підтверджено') : !v.stale ? 'стан не підтверджено' : 'немає даних';
+      var pvTxt = v.pv === 'gen' ? 'генерація' + (v.kw != null ? ', ' + num(v.kw, 1) + ' кВт' : '') : v.pv === 'cloud' ? 'генерацію не підтверджено' + (v.kw != null ? ', ' + num(v.kw, 1) + ' кВт' : '') : v.pv === 'night' ? 'ніч' + (v.kw != null ? ', ' + num(v.kw, 1) + ' кВт' : '') : v.kw != null ? num(v.kw, 1) + ' кВт; стан не визначено' : 'немає даних';
       panel.innerHTML = '<div class="hd"><div><b>Живлення будинку</b><div class="muted" style="margin:2px 0 0">СЕС 42,3 кВт · накопичувач 60 кВт·год</div></div><button type="button" class="x" id="powerx" aria-label="Закрити">✕</button></div>' +
         '<dl><dt>Мережа</dt><dd>' + gridTxt + '</dd><dt>Сонце</dt><dd>' + pvTxt + '</dd>' +
-        (S.today != null ? '<dt>Сьогодні</dt><dd>' + num(S.today, 0) + ' кВт·год</dd>' : '') +
-        (S.soc != null ? '<dt>Батарея</dt><dd>' + Math.round(S.soc) + ' %</dd>' : '') +
-        (S.outages != null ? '<dt>Вимкнень сьогодні</dt><dd>' + S.outages + '</dd>' : '') +
-        '<dt>Оновлено</dt><dd>' + (S.updated ? fmtT(S.updated) : '—') + '</dd></dl>' +
-        (S.source === 'none' ? '<p class="muted">Дані з інвертора ще не підключено. Коли сервер почне їх приймати, тут буде стан мережі й сонця: зникнення мережі — протягом 30 секунд, решта — підсумками кожні 5 хвилин.</p>' : '') +
-        (S.source === 'demo' ? '<p class="muted">Показ станів для перевірки — не справжні дані.</p>' : '') +
+        '<dt>Виміряно</dt><dd>' + (S.updated != null ? fmtT(S.updated) : '—') + '</dd>' +
+        '<dt>Отримано сервером</dt><dd>' + (S.received != null ? fmtT(S.received) : '—') + '</dd></dl>' +
+        '<p class="muted" role="status">' + statusText(v) + '</p>' +
+        (request === 'login' ? '<p><a href="/block8-reporting/v1/auth/login">Увійти</a></p>' : '') +
+        '<p><button type="button" id="powerrefresh">Оновити</button></p>' +
         '<div class="set"><label><input type="checkbox" data-o="show"' + (opts.show ? ' checked' : '') + '> показувати віконце на екрані</label>' +
         '<label><input type="checkbox" data-o="nums"' + (opts.nums ? ' checked' : '') + '> показувати кВт</label>' +
         '<label><input type="checkbox" data-o="blink"' + (opts.blink ? ' checked' : '') + '> сонце блимає, коли є генерація</label></div>';
       $('powerx').onclick = closePanel;
+      $('powerrefresh').onclick = poll;
     }
     function openPanel() { panel.hidden = false; renderPanel(); }
     function closePanel() { panel.hidden = true; }
@@ -8142,38 +8178,39 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     window.addEventListener('resize', place);
 
     /* дані */
-    function apply(j, src) {
-      if (!j) return;
-      S.grid = j.grid && /^(on|off)$/.test(j.grid.state) ? j.grid.state : 'unknown';
-      S.since = j.grid && j.grid.since ? Date.parse(j.grid.since) || null : null;
-      S.kw = j.pv && typeof j.pv.kw === 'number' ? j.pv.kw : null;
-      S.today = j.pv && typeof j.pv.today_kwh === 'number' ? j.pv.today_kwh : null;
-      S.soc = j.battery && typeof j.battery.soc === 'number' ? j.battery.soc : null;
-      S.outages = j.grid && typeof j.grid.outages_today === 'number' ? j.grid.outages_today : null;
-      S.updated = j.updated ? Date.parse(j.updated) || Date.now() : Date.now();
-      S.source = src; render();
+    function apply(j) {
+      var next = adaptPower(j);
+      S = next || emptyState(); request = next ? 'ok' : 'invalid'; render();
     }
-    function poll() {
-      if (!POWER_URL || document.hidden) return;
-      fetch(POWER_URL, { credentials: 'omit', cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) { apply(j, 'server'); }).catch(function () { render(); });
+    async function poll() {
+      if (document.hidden || inFlight) return;
+      inFlight = true;
+      var ctrl = new AbortController(), timer = setTimeout(function () { ctrl.abort(); }, 8000);
+      try {
+        var r = await fetch(POWER_URL, { credentials: 'same-origin', cache: 'no-store', redirect: 'error', signal: ctrl.signal });
+        if (!r.ok) {
+          request = r.status === 401 ? 'login' : r.status === 403 ? 'forbidden' : 'unavailable';
+          S = emptyState(); render(); return;
+        }
+        var j;
+        try { j = await r.json(); } catch (e) { S = emptyState(); request = 'invalid'; render(); return; }
+        apply(j);
+      } catch (e) { request = 'network'; render(); }
+      finally { clearTimeout(timer); inFlight = false; }
     }
-    var DEMO = {
-      on: { grid: { state: 'on', since: new Date(Date.now() - 3 * 3600e3).toISOString(), outages_today: 2 }, pv: { kw: 18.6, today_kwh: 96 }, battery: { soc: 74 } },
-      off: { grid: { state: 'off', since: new Date(Date.now() - 42 * 60e3).toISOString(), outages_today: 3 }, pv: { kw: 9.1, today_kwh: 61 }, battery: { soc: 58 } },
-      cloud: { grid: { state: 'on' }, pv: { kw: 0.2, today_kwh: 12 }, battery: { soc: 81 } },
-      night: { grid: { state: 'on' }, pv: { kw: 0 }, battery: { soc: 66 } }
-    };
     window.P00.power = {
-      state: function () { var v = view(); return { grid: v.grid, pv: v.pv, kw: S.kw, since: S.since, updated: S.updated, source: S.source, show: opts.show }; },
-      demo: function (k) { S.forceNight = k === 'night'; var d = DEMO[k]; if (!d) { S.updated = null; S.source = 'demo'; render(); return; } var j = JSON.parse(JSON.stringify(d)); j.updated = new Date().toISOString(); apply(j, 'demo'); },
-      open: openPanel, close: closePanel
+      state: function () { var v = view(); return { grid: v.grid, pv: v.pv, kw: v.kw, since: v.since, updated: S.updated, received: S.received, source: S.source, request: request, stale: v.stale, show: opts.show }; },
+      open: openPanel, close: closePanel, refresh: poll
     };
-    var dayOrig = day; day = function () { return S.forceNight ? false : dayOrig(); };
-    if (/[?&]power=demo\b/.test(location.search)) { var seq = ['on', 'cloud', 'off', 'night', 'none'], i = 0; S.source = 'demo'; (function cycle() { window.P00.power.demo(seq[i % seq.length]); i++; setTimeout(cycle, 6000); })(); }
-    render(); poll(); setInterval(poll, POLL_MS); setInterval(render, 15000);
-    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+    render(); poll(); setInterval(poll, POLL_MS); setInterval(render, 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) { render(); poll(); } });
   });
 })();
 </script>
 <script src="reports/panel.js" data-reporting-base="https://srv1208299.hstgr.cloud/block8-reporting/v1/reports/" defer></script>
+<script src="operations/navigation.js" defer></script>
+<script src="operations/notification_client.js" defer></script>
+<script src="operations/workforce_ui.js" defer></script>
+<script src="operations/warehouse_extension_ui.js" defer></script>
+<script src="operations/workspace.js" data-facility-id="7faea0c2-6f17-8c3c-88b5-77858aa65072" defer></script>
 </body></html>

@@ -1,0 +1,73 @@
+{
+  "status": "LIVE_MQTT_SQL_ATLAS_VERIFIED",
+  "at_utc": "2026-10-31T17:25:34.688135+00:00",
+  "url": "https://srv1208299.hstgr.cloud/atlas-reports-preview/",
+  "ingest_started_at": "2026-10-31T16:23:37.066170+00:00",
+  "observed_new_telemetry": 419,
+  "observed_new_status": 1,
+  "new_ingest_rejections": 0,
+  "last_snapshot_at_utc": "2026-10-31T16:58:30.967651+00:00",
+  "replayed_messages": 6903,
+  "replay_repeat_new_rows": 0,
+  "original_rejections_preserved": true,
+  "unknown_meta_count": 0,
+  "queue_pending": 0,
+  "projection_source": "FRESH",
+  "grid_state": "UNKNOWN_NOT_INFERRED_FROM_VOLTAGE_PRESENT",
+  "quality_skips": [
+    {
+      "receipt_id": "30294783-6352-4395-81b6-a2600871163f",
+      "received_at": "2026-10-31 16:46:03.620054+00:00",
+      "reason": "logger21 cycle completion in future"
+    },
+    {
+      "receipt_id": "221eed75-d171-4c3e-a2b5-c7b6c42a9912",
+      "received_at": "2026-10-31 16:54:42.949509+00:00",
+      "reason": "logger21 cycle completion in future"
+    },
+    {
+      "receipt_id": "f71b2364-0983-4c1c-b568-e2730032b0e9",
+      "received_at": "2026-10-31 16:56:23.366959+00:00",
+      "reason": "logger21 cycle completion in future"
+    }
+  ],
+  "quality_skips_still_saved_in_sql": true,
+  "legacy_5m_history_recomputed": false,
+  "public_assets": 81,
+  "preserved_ciphertexts": 23,
+  "bff_routes": 54,
+  "reader_sql_functions": 42,
+  "notification_worker_restarted": false,
+  "mqtt_broker_or_credentials_changed": false,
+  "browser": {
+    "normal_owner_sso": true,
+    "authenticated_live_state": true,
+    "timestamps_advance": true,
+    "viewport": [
+      390,
+      844
+    ],
+    "panel_bounds": [
+      10,
+      62,
+      380,
+      396.125
+    ],
+    "physical_phone_tested": false,
+    "screenshot": "D:\\GPT\\work\\atlas-deye-20261031\\live-power-mobile.jpg"
+  },
+  "evidence": {
+    "D:\\GPT\\work\\deye-compat-20261031\\REHEARSAL_RESUME.json": "3d51b2d76d197f042cef41ac12b1c56de9574d7dc5fd1dc75a3c44adde94f984",
+    "D:\\GPT\\work\\deye-compat-20261031\\HISTORICAL_REPLAY_RESULT.json": "895206802b3e1749147ffbe08e6861e5d78ac1b1c48f4565ccaf7c93b95784d2",
+    "D:\\GPT\\work\\deye-compat-20261031\\LIVE_PIPELINE_1.json": "403c7647267aa61287b826f8ff31b5e9c667f48f7044df18ff1d6931c645c23f",
+    "D:\\GPT\\work\\deye-compat-20261031\\LIVE_PIPELINE_2.json": "801f42b1a62712eabae6c7f31b584dcb90bb409f93a95124b90601ffaf85d934",
+    "D:\\GPT\\work\\deye-compat-20261031\\POWER_ACL_REHEARSAL_RESULT.json": "697f63650c7d85abc26171957375fcfa0d8fd87ef2ec3a876f70064ba04f6417",
+    "D:\\GPT\\work\\atlas-deye-20261031\\SERVICE_ACTIVATION.json": "7bdd8b0de5e15e3c580a092cf5c17e83a45efc0bc81a83fd220dec9250f62033",
+    "D:\\GPT\\work\\atlas-deye-20261031\\PUBLICATION_RESULT.json": "a7cf948e5cbcbfd5af2fd7822f0a98746569f1259ffb7c36b8978f05d89c8354",
+    "D:\\GPT\\work\\atlas-deye-20261031\\MODEL_REGRESSION.json": "fbfc534be0e9f2bc79e13ef3c0e3f35bcc5b483a937c1b18a379e2d190e78035"
+  },
+  "caddy_sha256": "9f5d44a6c08293867f8e393e17dda0f079e640fa56c78be4e6cdfa2bc023dafd",
+  "bff_unit_sha256": "9f2b15c43bb3d232570ea6c593fdf005959df520ecabd56548e6a941163e88f4",
+  "bff_manifest_sha256": "2d43da0d0710ae267273b8c66a0a711642a7636a6a9a836a2ef163ad665724d0",
+  "journal": "Official launcher whoami still requires trusted --hook-session-id; no bypass or substitute SQL used."
+}

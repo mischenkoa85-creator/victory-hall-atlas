@@ -1,0 +1,80 @@
+{
+  "status": "DEPLOYED_OWNER_BROWSER_VERIFIED_REAL_DEVICE_OPT_IN_PENDING",
+  "at_utc": "2026-10-31T11:18:06.170802+00:00",
+  "url": "https://srv1208299.hstgr.cloud/atlas-reports-preview/",
+  "approved_scope": [
+    "verified staff and team permissions",
+    "private team task assignment",
+    "in-app and opt-in Web Push notifications",
+    "warehouse reservations and partial returns"
+  ],
+  "evidence_folder": "D:\\GPT\\work\\atlas-workforce-20261031",
+  "evidence": {
+    "backup-result.json": {
+      "status": "PASS_WORKFLOW_BACKUP_RESTORE",
+      "sha256": "91653a6509dfc4712de3080ad2df0bc63b7decfa1409b6e6eb0579a648946a2d"
+    },
+    "rehearsal-result-r2.json": {
+      "status": "PASS_COMBINED_007_010_REHEARSAL",
+      "sha256": "6ae06c8ae7cb9f9b2ca8a1e109c1ece830fc68c3d93f35b9a84c86121699cd3b"
+    },
+    "migration0122-rehearsal.json": {
+      "status": "PASS_MIGRATION_0122_REHEARSAL",
+      "sha256": "1d1f99f204bdf4affe82de19d7acbdcf8681e5aa6530eb070fc4bf756aec5c2a"
+    },
+    "migration0122-live.json": {
+      "status": "PASS_LIVE_MIGRATION_0122",
+      "sha256": "75a964eced230c8ae2ec5e3754e836b850ced3f9d16ce9d34f4d2dea89340536"
+    },
+    "service-stage-r2.json": {
+      "status": "PASS_WORKFORCE_SERVICE_STAGED",
+      "sha256": "2c2b6c227d6de54ce2f8c8f150d16fecac76f2c3421628e47356c0e19bc23788"
+    },
+    "service-activation-r2-retry.json": {
+      "status": "PASS_WORKFORCE_BFF_ACTIVE",
+      "sha256": "0c9222ed62894da2d8fd54e4822f83fdba06d5fd12a5e745bd43a1ff757a6b3a"
+    },
+    "peer-bridge-resume-result.json": {
+      "status": "PASS_NOTIFICATION_PEER_BRIDGE_RESUME",
+      "sha256": "66c3099d53b106bde5c2c8e7ed885ffe2ce20b88ad5ee5045a7d757519bfa22d"
+    },
+    "notification-worker-activation.json": {
+      "status": "PASS_NOTIFICATION_WORKER_ACTIVE",
+      "sha256": "f983015aa43af296f6b839a877dacf4af162f571461e4b42d634b4253f5e6c05"
+    },
+    "publication-result.json": {
+      "status": "PASS_PUBLIC_WORKFORCE_UI",
+      "sha256": "1065cd0f5f3e1d5e1518fc35f2a5b43d6b992b1a2818911deb5deedeeae1b5ce"
+    },
+    "UI_BROWSER_RESULT.json": {
+      "status": "PASS_OWNER_BROWSER_READ_ONLY",
+      "sha256": "bbc688fc75ae40c5438f69eb600e6ae336752e0ae073fe90e17b4a482bb891cf"
+    }
+  },
+  "source_head": "0122_atlas_workforce_20261031",
+  "schema_sha256": "d309545817dbc117eacb02a466bb3ad5fb47aaff578b468e56802e3dee6be162",
+  "source_manifest_sha256": "8b16b33558d4e2db048d2e7be96514f5f7b8151061cf6394627d88e250505dd7",
+  "bff_release": "/opt/victory-hall-atlas-bff/releases/atlas-workforce-r2-20261031",
+  "bff_unit_sha256": "a5b078108ad3b585db6bdd6a0e4a91901088b6e880c32679287debcf82d5e042",
+  "public_root": "/srv/victory-hall-atlas-preview/releases/atlas-workforce-20261031/public",
+  "caddy_sha256": "60d7e45dead21f568d71f06b5f67ecb71d1032a29c208bc07bf633ac544cee6e",
+  "verified_assets": 81,
+  "preserved_encrypted_assets": 23,
+  "native_routes": 53,
+  "reader_functions": 42,
+  "worker_functions": 5,
+  "actual_pg_test_groups": {
+    "staff": 6,
+    "warehouse": 12,
+    "notifications": 6
+  },
+  "browser": "owner SSO, board/staff/warehouse/preferences and390x844 PASS",
+  "production_demo_business_rows": 0,
+  "physical_phone_tested": false,
+  "actual_device_push_tested": false,
+  "email_telegram_available": false,
+  "new_person_access_granted": false,
+  "first_member_pending": "Own first Google login required; private details remain outside repository",
+  "journal": "BLOCKED: exact official launcher whoami lacks trusted --hook-session-id; no bypass used",
+  "unrelated_power_feed_changed": false
+}

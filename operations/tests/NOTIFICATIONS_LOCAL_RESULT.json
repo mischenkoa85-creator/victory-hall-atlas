@@ -1,0 +1,59 @@
+{
+  "status": "PASS_LOCAL_NOTIFICATION_WITH_LIMITS",
+  "generated_at": "2026-10-31T09:26:07.372521+00:00",
+  "external_messages_sent": 0,
+  "real_endpoints_used": 0,
+  "native_keys_generated_or_read": false,
+  "native_service_deployed_by_this_agent": false,
+  "python_tests": {
+    "passed": 46,
+    "command": "python -m pytest operations/tests/test_notifications.py operations/tests/test_notification_runtime.py -q",
+    "warning": "Starlette httpx TestClient deprecation; tests passed"
+  },
+  "javascript_vm_tests": {
+    "passed": 8,
+    "status": "PASS_NOTIFICATION_CLIENT_SW_MOCKS",
+    "external_requests": 0
+  },
+  "real_encoder_roundtrip": "pywebpush2.5.0 / http-ece1.2.1; synthetic key pair; no HTTP",
+  "actual_child_deadline_test": "Spawned sleep-only child terminated at wall deadline; no DNS/HTTP",
+  "isolated_pg_rehearsal": {
+    "receipt": "D:\\GPT\\work\\atlas-workforce-20261031\\rehearsal-result-r2.json",
+    "receipt_sha256": "6ae06c8ae7cb9f9b2ca8a1e109c1ece830fc68c3d93f35b9a84c86121699cd3b",
+    "status": "PASS_NOTIFICATION_PG",
+    "cases": 6,
+    "sql_sha256": "26f79853aea18a67a2a8cb585e41acead8130b5b5ed7899ab249b1a5edeefc0b",
+    "api_sha256": "b867c1006a02cc9c2f74a4b08365087369305b78720d2466b085f8d36676a84b",
+    "worker_sha256": "3e837b9db208b91299a5b03d1f3b14d20ccfc85e75ab4f576aaf15854be9c27a",
+    "crypto_at_rehearsal_sha256": "b6f2cee69578bc6bc34f8ab64ad8ff435e9859b0b0c8f5e0af34bc6f495058dd",
+    "crypto_current_sha256": "ae8ef6b53369f78ba54bf6582f7769a1467321ce11baa10f9e074291eed020a0",
+    "crypto_delta": "After rehearsal: canonicalize default443/scheme case/unreserved percent URL aliases and reject dot/control path aliases. Covered by dependent local crypto regression; Linux dependent check remains root integration."
+  },
+  "limitations": [
+    "No real browser permission/subscription/receipt acceptance",
+    "No native systemd credentials or peer-auth verification by this agent",
+    "Linux runtime extras and native child lifecycle require final native checks",
+    "Provider acceptance is not device delivery/read",
+    "Concurrent revoke after begin_dispatch commit cannot retract an already authorized generic push"
+  ],
+  "files_sha256": {
+    "sql/008_notification_channels_candidate.sql": "26f79853aea18a67a2a8cb585e41acead8130b5b5ed7899ab249b1a5edeefc0b",
+    "notification_api.py": "b867c1006a02cc9c2f74a4b08365087369305b78720d2466b085f8d36676a84b",
+    "notification_crypto.py": "ae8ef6b53369f78ba54bf6582f7769a1467321ce11baa10f9e074291eed020a0",
+    "notification_worker.py": "3e837b9db208b91299a5b03d1f3b14d20ccfc85e75ab4f576aaf15854be9c27a",
+    "notification_client.js": "11dc45f3b0fb3b70129396cd4c74770246e065a8e51d59b10158d39e38ce37d9",
+    "notification-sw.js": "2ad901bd0684746d426644afc7dc153fdecc901499f1579d3e331de4ceef3547",
+    "notification_runtime.py": "2c4f31419d71111761b138f81ddce9bae4783e3a43dcdbcb8c12857bedbf00d0",
+    "notification_worker_main.py": "83357c0e710ad9248852628d9420e1cf64ec132adeb4eb4c7012bbc7c70b9d5e",
+    "requirements-notifications.txt": "cba99541ec3c95efde0182d850f213a96229dba7f09b47f64afb44e97a93c29c",
+    "requirements-notifications-lock.txt": "6af3695e034f724825aebc0d0b56b59d2cd9a0ee235c3e18517933d2126c4221",
+    "sql/NOTIFICATIONS_README_UA.txt": "183241eed752c2c87e95afc192cc6c4b4a12a649252c2c0c78f615a0e3b188c3",
+    "integration/NOTIFICATIONS_PROVISIONING_UA.txt": "245672b1acea3ca805028d26391af810e6199622859f3cdfe7753d6fba546f95",
+    "integration/notification-worker.service.template": "5007665e0cd0308b9525cdd797a9cb48cbed6a025b69719e0c2ccd27f8b00f05",
+    "integration/notification-bff-credentials.conf.template": "1aa1f42f2246991f627df65b00ae962d7210c06ff92b10f5f71c1b792e47894d",
+    "tests/test_notifications.py": "e17346fed871ed0694cd62998d12986d564a5eebf629579e7ecebf6b1c699a45",
+    "tests/test_notification_runtime.py": "b0cc548e170a81c0114cfa87291f05b4d9c98a90ba456f1e2bc997882e46424f",
+    "tests/test_notification_client.mjs": "2212bd504db47b2c9683a8339d9c108115ce7519862b5dff3e325d4774027ba5",
+    "tests/notification_pg_check.py": "ed68a390ff77d2055c898573d32e47a2866f85a5acac839257c4c8e3d052dc3c"
+  }
+}

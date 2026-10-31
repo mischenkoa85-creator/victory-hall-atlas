@@ -1,0 +1,40 @@
+Незалежний локальний review workforce staff/group UI та складського wiring
+Виконавець: /root/warehouse_reservations
+Статус: PASS_STATIC_AND_DOM_MOCK, 14/14 сценаріїв PASS.
+
+Перевірена версія workforce_ui.js:
+42faac4bc4c26fbc033352dd7e726da805bdb5fdd5a5eee4bc4916ba4936d8c7
+Перевірена версія workspace.js:
+11699e5d8508674f423cd9a4142dc941cced3be33fdcf8081f6ebebd48a1fa2b
+Новий test_workforce_ui.cjs:
+df1354bfc88f1749c2cc484747603802eab6207e61ee4670a2f4c9d74b06bf53
+
+Знайдені та виправлені root у межах цього review проблеми:
+- claim acknowledgement не перевіряв assignee_id; тепер звіряє current actor,
+  а offer/withdraw вимагають assignee_id=null;
+- scope acknowledgement приймав будь-які масиви; тепер звіряє повний набір
+  пар category/location + capability без залежності від порядку;
+- staff confirm не звіряв candidate_id, member ACK — nested facility/team;
+- UI не дозволяв передати assigned task групі, хоча SQL цей перехід дозволяє;
+- після await team options не перевірялися повторно actor/category permission;
+  тепер перевіряються після await і перед формуванням команди.
+
+Тести перевіряють також: private queue не показує title/details до claim,
+лише перевірені account selectors без ручного UUID, exact version validation,
+нова UUID для створення групи, explicit fresh reload після ACK, unknown/empty
+state, максимум100 елементів сторінки та deduplication, detached task slot,
+порядок includes фабрик до workspace.
+
+Warehouse wiring переглянуто:
+- location:currentLocation передає об'єкт місця, а не ідентифікатор;
+- busy враховує незавершену pending операцію;
+- on_hand / reserved / available показано окремо; unknown не замінено нулем;
+- рядки quantity не перетворюються на floating number для обчислення залишку;
+- history підтримує return і reversal, перевірки остаточно виконує SQL;
+- extension command використовує спільний pending/uncertain протокол.
+
+Результат сценаріїв: WORKFORCE_UI_DOM_MOCK_RESULT.json.
+node --check workforce_ui.js, workspace.js і test_workforce_ui.cjs пройшов.
+Root source-файли reviewer не змінював; лише власні тести та квитанції.
+Браузер, мережа, сервер, PostgreSQL і реальні облікові записи не використовувалися.
+Notification UI окремо переглядає notification_finish; це не його acceptance.

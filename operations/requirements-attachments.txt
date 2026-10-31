@@ -1,0 +1,2 @@
+# Image decoder is mandatory; missing decoder must fail closed.
+Pillow==13.0.0

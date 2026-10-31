@@ -1,0 +1,66 @@
+PORTABLE SYNTHETIC WAREHOUSE / BOARD / PHOTO / COMMAND REHEARSAL
+
+Actual Linux R2 execution: PASS; private Unix-only cluster stopped.
+Exact-byte dependency manifest: REHEARSAL_FILES.json (27 files).
+This is the frozen baseline at commit62f588d8f49276753cfcaa928afdbabb07f87239.
+Extract operations files from that commit, not a later working tree. Rework has
+separate current-source tests and BOARD_REWORK_ACCEPTANCE.json.
+Files prefixed session/ are external reviewed session-core dependencies supplied
+by the operator. This synthetic core is not claimed to be the current production
+BFF; operations/integration separately checks the current assembled BFF on a
+private restored clone with real low-privilege roles.
+
+Bundle files:
+operations/attachment_api.py
+operations/attachment_store.py
+operations/board_api.py
+operations/command_resolution_api.py
+operations/requirements-attachments.txt
+operations/sql/001_warehouse_candidate.sql
+operations/sql/002_board_candidate.sql
+operations/sql/003_attachments_candidate.sql
+operations/sql/004_workspace_context_candidate.sql
+operations/sql/005_command_resolution_candidate.sql
+operations/tests/attachments_pg_check.py
+operations/tests/board_http_pg_check.py
+operations/tests/board_pg_check.py
+operations/tests/command_resolution_pg_check.py
+operations/tests/test_attachment_store.py
+operations/tests/test_warehouse_pg.py
+operations/tests/warehouse_http_pg_check.py
+operations/tests/workspace_pg_check.py
+operations/warehouse_api.py
+operations/workspace_api.py
+session/bff/__init__.py
+session/bff/models.py
+session/bff/repository.py
+session/bff/security.py
+session/requirements.lock
+session/sql/00_roles.sql
+session/sql/01_session_core.sql
+
+Install session/requirements.lock and operations/requirements-attachments.txt
+into the isolated reviewed runtime. No credentials or live runtime config.
+
+python -u -B operations/tests/test_warehouse_pg.py \
+  --pg-bin /usr/lib/postgresql/17/bin \
+  --session-sql-dir /absolute/bundle/session/sql \
+  --output /short/new/private/path \
+  --http-check --board-http-check --attachments-check --workspace-check --resolution-check
+
+Run as an unprivileged OS identity. Output must not exist. initdb creates a NEW
+warehouse_synthetic cluster; Linux uses a private0700 Unix socket, no TCP listener.
+No GREEN or other existing database connection. Runtime fsync remains on. Runner
+finally stops that exact cluster. Preserve evidence and inspect any unknown outcome
+before another attempt; do not overwrite an existing result directory.
+
+Run test_attachment_store.py separately on Linux for private permissions,
+symlink refusal, immutable publication and original-byte integrity.
+Windows-only coverage is reported as skipped on Linux, not as passed.
+
+Receipts: RESULT.json, HTTP_SQL_RESULT.json, BOARD_SQL_RESULT.json,
+BOARD_HTTP_SQL_RESULT.json, ATTACHMENTS_RESULT.json, WORKSPACE_HTTP_SQL_RESULT.json,
+COMMAND_RESOLUTION_RESULT.json. Tests cover real SQL, API and private files using
+synthetic identities. Real owner login and physical phone acceptance are separate.
+The old board-only HTTP suite uses an explicit synthetic attachment registry;
+the attachment suite supplies ActualAttachmentVerifier and real private files.

@@ -1,0 +1,51 @@
+Незалежний локальний review: staff/team 007, API та resolver 010
+Виконавець: /root/warehouse_reservations
+Статус: PASS_STATIC_AND_HTTP_CONTRACT; PostgreSQL runtime НЕ перевірявся цим виконавцем.
+
+Обсяг і точні SHA-256:
+sql/007_staff_teams_candidate.sql
+f080f0082733bbde6381767f86ccc1de864d04ceda9f38933c89bfa70f8c4a48
+staff_team_api.py
+1fda432ab6c685768512d49a0f1641390df69b74fe2ec3c202748786fe40c41f
+sql/010_extended_command_resolution_candidate.sql
+a096dedb14c2068f84f8d9735ee05ff9bb280b21f3e0f522391926e58a79cac5
+
+Перевірено читанням коду:
+1. Реєстрація identity evidence лише native invoker; HTTP не приймає issuer,
+   subject, actor_id, owner role або meter.capture. Кандидат звіряється за
+   user_id + identity_id + issuer + subject; одного збігу email недостатньо.
+2. Підтвердження працівників, відкликання та налаштування груп потребують
+   чинного owner_admin FACILITY, confirmed_by_owner, активного користувача.
+   Строк підтвердження та членства обмежений повноваженням власника і staff.
+3. Немає нових прямого table grants або публічних helper grants. Нові таблиці
+   мають FORCE RLS / owner-only policy. Публічно відкриті лише guarded функції.
+4. Staff/team admin бере facility EXCLUSIVE до command-key/рядків і не бере
+   task/item locks. Task writers беруть SHARED до task -> command-key.
+   Legacy _command_lock бере SHARED до ключа. Resolver 010 не бере rowlock
+   task/item під command-key; структурної інверсії в перевірених шляхах немає.
+5. Очікувана version перевіряється під lock; одна task row серіалізує claims.
+   Claim не приймає іншого assignee: виконавцем стає поточний verified actor.
+6. Зміна, event/outbox, audit та command receipt перебувають в одній SQL
+   транзакції. API формує відповідь після виходу з repository._request,
+   тобто після COMMIT. Помилка audit/commit не стає успішною відповіддю.
+7. Staff/team keys розділені facility + actor + domain; replay порівнює
+   повний request; CANCELLED не може стати пізньою виконаною командою.
+8. 010 повторно перевіряє поточний scope committed receipt: staff/team —
+   поточний owner; reservation — locations + доступ до task; preference —
+   власний user_id + актуальний notification access. Чужі namespaces не читаються.
+9. Private team queue показує лише службові метадані до claim; title/details
+   не видаються без board_can_read. Після claim програвший не стає assignee.
+10. Відкликання staff знімає work grants і членства, але свідомо зберігає
+    resident / legacy / board_admin. Залишкові прямі права відображено в
+    remaining_direct_grants: staff revoke не заявляє глобальне блокування акаунта.
+
+Локальне виконання:
+test_staff_team_api.py + test_command_resolution_api.py: 21 passed, 0 failed.
+Використано reviewed session package на sys.path; тести HTTP використовують mocks.
+Один warning Starlette про застарілий httpx TestClient, на результат не вплинув.
+SQL007 та SQL010 НЕ застосовувалися, сервер/дані/реальні права не змінювалися.
+
+Блокувальних findings за цим статичним review не знайдено.
+Рішення про runtime готовність лишається за root після combined 007-010 PG
+перевірок: concurrent claim/revoke, resolver races, audit rollback, revoked
+receipt privacy, low-role ACL та інтеграція reservations/notifications.

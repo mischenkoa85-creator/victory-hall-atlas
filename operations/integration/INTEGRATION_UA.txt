@@ -1,0 +1,74 @@
+МІНІМАЛЬНЕ ПІДКЛЮЧЕННЯ OPERATIONS ДО ЧИННОГО BFF — КАНДИДАТ
+
+Базовий реліз: atlas-session-5295450a2d458ca6.
+Повний локальний source snapshot знайдено:
+D:/GPT/work/atlas-login-stage1-20261019/session/atlas-combined-bff-20261020/release
+SOURCE_MANIFEST SHA256: 5295450a2d458ca6a3b6ff6a3977e55d61047bc9af2a3c0d65c1c36a743142f6.
+Код збігається з цим manifest; NATIVE_READBACK.json пов'язує його з прийнятим
+серверним релізом. Це історичний readback, перед новим deploy потрібна свіжа перевірка хешів.
+Env-файли та credentials не читалися й не копіювалися.
+
+Фактично побудовано локальний code-only candidate:
+D:/GPT/work/atlas-expansion-20261030/bff-integration-candidate-3
+INTEGRATION_MANIFEST.json та code-delta.patch поруч із release/.
+Базові джерела не змінено. Runtime SQL/API/фронтенд у repo не змінені цим wiring.
+
+Зміна1: assembly.build_application приймає trusted optional operations_store для
+ізольованих тестів. Після attach_reports викликається attach_operations із ТИМ САМИМ
+SQLSessionRepository. Native RuntimeInputs/protected providers залишаються незмінними.
+create_application як і раніше використовує захищений runtime; HTTP не може задавати store.
+
+Зміна2: bff.app.headers лишає 32768 bytes для всіх звичайних запитів. Лише точний
+POST /v1/session/attachments/{uuid}/tasks/{uuid} із JPEG/PNG/WebP та identity encoding
+має 5MiB allowance. attachment_api додатково обмежує фактичний body stream незалежно
+від Content-Length. Інші методи/шляхи/MIME/gzip не отримують розширення.
+
+Новий hook atlas_operations_integration.py поруч з assembly.py:
+- перевіряє походження bff.models/security/repository з того самого SESSION;
+- перевіряє походження operations модулів з нового release/operations;
+- підключає warehouse, board, attachments, workspace, command resolution;
+- передає ActualAttachmentVerifier(board) і той самий private store(attachments);
+- не допускає повторного mount або route collisions;
+- missing/relaxed image decoder чи непридатний private store зупиняє startup;
+- не читає env, cookie storage, credentials або довільні файли з HTTP.
+
+Фото: /var/lib/victory-hall-atlas-attachments ПОЗА web-root.
+Потрібно provision owner/group vh-atlas-bff (UID986/GID978), directory0700, files0600, backup/restore.
+Не розширювати ACL чинного /var/lib/victory-hall-atlas, який має root0700.
+Чинний unit має ProtectSystem=strict і не має потрібного ReadWritePaths.
+Новий unit повинен додати ЛИШЕ:
+ReadWritePaths=/var/lib/victory-hall-atlas-attachments
+Решта auth/session/logout hardening, users, socket/principals і credentials лишаються.
+Потрібний окремий runtime з перевіреним Pillow13.0.0; чинний runtime не змінювати на місці.
+
+Caddy: перевірити поточний route matcher, upstream і body limit. Якщо нові session
+prefixes уже потрапляють у BFF18484, змінювати route не потрібно. Інакше додати лише
+warehouse/board/attachments/operations до того самого BFF, з точним 5MiB upload limit.
+Не перемаповувати legacy reports, OAuth callback або приватні дані в static file_server.
+
+Перевірено локально:8 integration tests із реальною assembly+чинним app middleware,
+штучними runtime providers і store; ніякої БД, мережі, logout worker чи protected loader.
+Збережені auth/report маршрути; нові anonymous requests401; photo40KiB проходить
+header limit і відхиляється401 до SQL/store; JSON/іншішляхи40KiB таphoto>5MiB→413;
+duplicate mount і shadowed operation module відхиляються.
+Новий OperationsBodyLimit обмежує фактичні byte chunks лише operations POST до
+FastAPI JSON parsing: 32KiB JSON, 5MiB лише точний raw-image маршрут. Missing CL,
+chunked body і disconnect перевірені; авторизація, старі auth/report маршрути
+й PostgreSQL connector не обходяться. Жодної перевірки лише за header недостатньо.
+
+Додатково root виконав full BFF тест на приватному відновленому клоні:
+restored-bff-test-result.json — PASS_RESTORED_BFF_WRAPPER / PASS_RESTORED_FULL_BFF.
+Окрема БД atlas_ops_bff_fixture_20261030, cluster7702557112009102907, існуючі
+low-privilege LOGIN-ролі, фактичний SQLSessionRepository та Pillow13.0.0.
+4 групи пройшли: session/context; склад+idempotency+скасування; board+реальне PNG
+понад32KiB+proof/download; chunked JSON413. Початкова відновлена БД не змінена,
+fixture DB залишена як доказ, клон зупинений. Використані лише синтетичні провайдери,
+а не облікові дані чи реальний вхід власника.
+
+Окремий server readback service-activation-result.json підтвердив новий unit active,
+реальні native prerequisites та6 anonymous routes401. Це не тест входу власника.
+Ще потрібне приймання через публічний Caddy/браузер: реальний користувач і телефон,
+практичний шлях роботи та зовнішній proxy body limit. Цей документ не стверджує,
+що браузерний вхід власника або нові реальні складські операції вже перевірені.
+Жодних deploy/SQL changes цей пакет не виконує. Новий SOURCE_MANIFEST/ExecStartPre
+мають бути зібрані й переглянуті root перед активацією; старий manifest не підміняти.

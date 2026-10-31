@@ -1,0 +1,5 @@
+# Native deployment must install the same reviewed lock as the BFF, then these.
+# pywebpush is used for RFC8291 encoding only; its HTTP sender is never invoked.
+cryptography==50.0.2
+pywebpush==2.5.0
+http-ece==1.2.1

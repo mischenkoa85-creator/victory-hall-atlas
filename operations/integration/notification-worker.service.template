@@ -1,0 +1,46 @@
+[Unit]
+Description=Victory Hall Atlas notification delivery
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=vh-atlas-notify
+Group=vh-atlas-notify
+WorkingDirectory=/opt/victory-hall-atlas-bff/releases/atlas-workforce-20261031/operations
+ExecStart=/opt/victory-hall-access/test-runtimes/atlas-session-29c45c9a02ff54c2/bin/python -B /opt/victory-hall-atlas-bff/releases/atlas-workforce-20261031/operations/notification_worker_main.py
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=PYTHONPATH=/opt/victory-hall-atlas-bff/releases/atlas-workforce-20261031/notification-extras:/opt/victory-hall-atlas-bff/releases/atlas-workforce-20261031/operations
+LoadCredential=atlas-notification-vault:/etc/victory-hall-atlas-notifications/vault.key
+LoadCredential=atlas-notification-vapid-private:/etc/victory-hall-atlas-notifications/vapid.private.pem
+UnsetEnvironment=PGPASSWORD PGPASSFILE PGSERVICE PGSERVICEFILE PGHOST PGHOSTADDR PGPORT PGDATABASE PGUSER PGOPTIONS
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=true
+SystemCallArchitectures=native
+LimitCORE=0
+TasksMax=32
+MemoryMax=256M
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=45
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
