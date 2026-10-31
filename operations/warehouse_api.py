@@ -21,6 +21,9 @@ class WarehouseConflict(ServiceUnavailable):
     def __init__(self, code): self.code = code
 
 MESSAGES = {
+ 'INSUFFICIENT_AVAILABLE':'Недостатньо вільного залишку: частина матеріалу зарезервована.',
+ 'ISSUE_HAS_RETURNS':'Спочатку сторнуйте пов’язані повернення; потім можна сторнувати всю видачу.',
+ 'RESERVATION_INVARIANT':'Стан резерву потребує перевірки адміністратором.',
     'COMMAND_CANCELLED':'Цей запит скасовано. Для нової дії створіть новий запит.',
     'OPENING_UNKNOWN':'Спочатку підтвердьте початковий залишок.',
     'OPENING_ALREADY_KNOWN':'Початковий залишок уже зафіксовано.',

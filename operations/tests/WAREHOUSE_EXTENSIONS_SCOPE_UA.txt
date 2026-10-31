@@ -1,0 +1,85 @@
+СКЛАД: РЕЗЕРВИ Й ЧАСТКОВІ ПОВЕРНЕННЯ — ЛОКАЛЬНИЙ КАНДИДАТ009
+Live SQL/BFF не змінено. Реальних людей, grants, запасів і повідомлень не створено.
+
+СЕМАНТИКА
+on_hand — підтверджений фізичний залишок; reserved — невикористаний резерв;
+available = on_hand - reserved. quantity лишається backward-compatible on_hand.
+Якщо початковий залишок невідомий, усі три кількості NULL, не нуль.
+Запитані кількості — додатні decimal strings, до3 знаків, менше10^15.
+
+Резерв прив'язаний через composite FK до task_id тієї самої facility.
+Reserve/release/issue-reservation потребують warehouse.read+warehouse.issue
+для місця та чинного board.read/scope до заявки. Для closed task новий резерв
+і видача заборонені, але явне release дозволене. Інших grants не додаємо.
+Issue-reservation зменшує on_hand і залишок резерву на ту саму кількість.
+Звичайна issue/transfer і всі відтоки від reversal перевіряють available, тому
+старий API не може витратити чужий резерв. Старий warehouse_post замінюється
+CREATE OR REPLACE у009; frozen001 не переписується.
+
+Partial return посилається на original issue; сума нескасованих returns не може
+перевищувати видачу. Можна вказати інший підтверджений склад повернення:
+потрібні read початкового складу та read+receipt місця повернення.
+Повернення збільшує on_hand, але не відновлює резерв автоматично.
+Строка issue list показує issued/returned/returnable; reservation view також
+розрізняє gross issued, returned і net issued.
+
+Full reversal issue заборонений, доки має активні returns. Return можна
+сторнувати, якщо відтік не зачепить резерви. Після сторно returns можна сторнувати
+всю issue. Якщо це reserved issue, її сторно відновлює відповідну частину резерву;
+звільнення відновленого резерву — окрема дія з поясненням.
+
+ІДЕМПОТЕНТНІСТЬ, LOCKS, ПРИВАТНІСТЬ
+Основний domain резервів — reservation; partial return — warehouse.
+Порядок: facility shared access gate (через007) → task SHARE → reservation key
+→ internal warehouse key для видачі → item advisory lock → reservation/stock rows.
+warehouse_post лишається warehouse key→item→rows; він не бере task lock під item.
+Internal key = reservation-issue:SHA256(facility:actor:reservation-command-key).
+Ключ реально захоплюється ДО item lock; непередбачуваність digest не є захистом.
+Фізична видача й reservation receipt/audit зберігаються атомарно; сторонню raw
+issue з таким ключем не можна «усиновити». Окремі immutable reservation events
+не підміняють фізичний warehouse ledger.
+
+Reservation list/history/task title/UUID видаються лише після board_can_read.
+Warehouse-only читач бачить reserved aggregate і фізичні рухи. Системний
+work_reference reserved issue — reservation-linked, без автоматичного task UUID.
+Typed зв'язок зберігається у operation.reservation_id → reservation.task_id.
+Read totals обчислюються в одному SQL snapshot. Write guards використовують
+VOLATILE helpers під item lock, щоб побачити власні й щойно завершені зміни.
+
+ІНТЕГРАЦІЯ ROOT
+1. Додати reservation у command_resolution.domain CHECK і _command_lock whitelist.
+2. _command_can_cancel(reservation): warehouse.read+warehouse.issue у facility;
+   committed _command_receipt_scope: locations read І board.read для target.task_id.
+   Resolver має plain MVCC read, без task/item row locks під command key.
+3. Додати reservation до ResolveCommand Literal та UI receiptDomains.
+4. Mount attach_warehouse_extensions(app,repository);6 нових HTTP routes під
+   existing /v1/session/warehouse/{facility_id}/..., no new listener.
+5. Native SQL allowlist доповнити6 functions із GRANT наприкінці009.
+6. У старий warehouse_api.MESSAGES додати INSUFFICIENT_AVAILABLE, ISSUE_HAS_RETURNS,
+   RESERVATION_INVARIANT; child existing API не редагував.
+7. UI після будь-якого write читає актуальний stock/reservation, не receipt snapshot.
+   Receipt reserve/command: data.reservation, data.balance, optional operation_id.
+   Return: data.status=posted, kind=return, original_issue_id, returned_quantity,
+   remaining_returnable, balances. Додати людську назву return у журнал.
+
+Нові public SQL functions:
+warehouse_reserve(uuid,text,uuid,uuid,uuid,uuid,numeric,text)
+warehouse_reservation_act(uuid,text,uuid,integer,text,numeric,text,text)
+warehouse_return(uuid,text,uuid,numeric,uuid,text,text)
+warehouse_reservation_list(uuid,uuid,integer,timestamptz,uuid)
+warehouse_issue_list(uuid,uuid,integer,timestamptz,uuid)
+warehouse_reservation_history(uuid,uuid,integer,integer)
+Інші нові helpers — приватні. Прямі таблиці/функції helper не надаються reader.
+
+ПЕРЕВІРКИ
+24 локальні HTTP-contract tests PASS; AST/generator checks PASS.
+test_warehouse_extensions_pg.py підготовлений, але child на сервері НЕ запускав.
+Root спершу створює окрему fixture DB на перевіреному приватному клоні та застосовує
+комбінований007–010 пакет. Тест вимагає exact clone identity/private socket/data
+directory, забороняє source sysid7679767825491556689 і port55435, не стартує PG
+і не створює БД. Marker запобігає повторному запуску на тому самому fixture state.
+Імпортувати треба той самий перевірений session package; pytest contract тести
+також потребують bff/ на sys.path.
+
+Подальші межі: ціни/витрати/бухгалтерія, автоматичне протермінування резервів,
+очищення журналу й довільні складські коригування цим пакетом не реалізуються.

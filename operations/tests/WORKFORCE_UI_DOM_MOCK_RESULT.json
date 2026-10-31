@@ -1,0 +1,64 @@
+{
+  "status": "PASS_WORKFORCE_UI_DOM_MOCK",
+  "cases": [
+    {
+      "name": "staff selector uses verified IDs internally, literal labels, no manual UUID; fresh GET after acknowledgement",
+      "status": "PASS"
+    },
+    {
+      "name": "staff acknowledgement rejects different verified candidate for same user",
+      "status": "PASS"
+    },
+    {
+      "name": "empty candidates and foreign owner state cannot fabricate account binding",
+      "status": "PASS"
+    },
+    {
+      "name": "team create uses generated UUID and version receipt; revoke keeps explicit remaining-rights notice",
+      "status": "PASS"
+    },
+    {
+      "name": "member receipt binds outer team, nested team/facility/user and active state",
+      "status": "PASS"
+    },
+    {
+      "name": "scope UI groups capabilities by category and location; catalog is separate null location",
+      "status": "PASS"
+    },
+    {
+      "name": "scope acknowledgement rejects dropped or unexpected permissions even with matching version",
+      "status": "PASS"
+    },
+    {
+      "name": "private group card masks title/details, claim identifies current actor only, then reloads task",
+      "status": "PASS"
+    },
+    {
+      "name": "claim receipt cannot assign the task to another actor",
+      "status": "PASS"
+    },
+    {
+      "name": "queue paging requests at most100 and uses last task cursor, with deduplication",
+      "status": "PASS"
+    },
+    {
+      "name": "late team options do not attach to a detached task slot",
+      "status": "PASS"
+    },
+    {
+      "name": "late team options recheck actor and category permission before exposing actions",
+      "status": "PASS"
+    },
+    {
+      "name": "assigned task can be reassigned to a group, matching reviewed SQL transition",
+      "status": "PASS"
+    },
+    {
+      "name": "index loads extension factories before workspace; warehouse wiring passes location object and pending-aware busy",
+      "status": "PASS"
+    }
+  ],
+  "workforce_ui_sha256": "42faac4bc4c26fbc033352dd7e726da805bdb5fdd5a5eee4bc4916ba4936d8c7",
+  "browser_executed": false,
+  "database_executed": false
+}

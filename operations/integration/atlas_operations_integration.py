@@ -1,10 +1,12 @@
 """Candidate assembly hook, copied beside service-candidate/assembly.py.
 
-No environment or credential reads. Production uses a fixed private filesystem
-directory. Optional store injection is a trusted factory/testing parameter only.
+Production uses a fixed private photo directory and a reviewed native notification
+credential adapter. Optional injections are trusted factory/testing parameters
+only; no request can select a credential path, vault or notification runtime.
 """
 from pathlib import Path
 from collections import deque
+from collections.abc import Mapping
 import importlib,re,sys
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -77,7 +79,7 @@ def _module(name):
         raise RuntimeError('OPERATIONS_MODULE_PATH_MISMATCH')
     return module
 
-def attach_operations(app,repository,*,store=None):
+def attach_operations(app,repository,*,store=None,notification_runtime=None):
     if getattr(app.state,'atlas_operations_attached',False) or app.middleware_stack is not None:
         raise RuntimeError('OPERATIONS_FACTORY_ONLY')
     for route in app.routes:
@@ -103,5 +105,20 @@ def attach_operations(app,repository,*,store=None):
     _module('attachment_api').attach_attachments(app,repository,store)
     _module('workspace_api').attach_workspace(app,repository)
     _module('command_resolution_api').attach_command_resolution(app,repository)
+    _module('staff_team_api').attach_staff_teams(app,repository)
+    _module('warehouse_extensions_api').attach_warehouse_extensions(app,repository)
+    # Bind imported dependencies before runtime import. Merely importing these
+    # libraries neither reads credentials nor starts delivery; None explicitly
+    # selects the native systemd adapter below, while {} keeps push unavailable.
+    crypto=_module('notification_crypto')
+    _module('notification_worker')
+    runtime=_module('notification_runtime')
+    notifications=runtime.load_bff_runtime() if notification_runtime is None else notification_runtime
+    if not isinstance(notifications,Mapping) or set(notifications) not in (set(),{'vault','push_public_key'}):
+        raise RuntimeError('OPERATIONS_NOTIFICATION_RUNTIME_INVALID')
+    notifications=dict(notifications)
+    if notifications and (not isinstance(notifications['vault'],crypto.EndpointVault) or not isinstance(notifications['push_public_key'],str)):
+        raise RuntimeError('OPERATIONS_NOTIFICATION_RUNTIME_INVALID')
+    _module('notification_api').attach_notifications(app,repository,**notifications)
     app.add_middleware(OperationsBodyLimit)
     app.state.atlas_operations_attached=True

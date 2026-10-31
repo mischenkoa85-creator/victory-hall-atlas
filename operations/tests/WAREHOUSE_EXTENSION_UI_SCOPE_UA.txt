@@ -1,0 +1,32 @@
+WAREHOUSE EXTENSION UI — ЛОКАЛЬНИЙ МОДУЛЬ, НЕ ПУБЛІКОВАНО CHILD
+
+Фабрика window.createAtlasWarehouseExtension(ui) повертає {render}.
+Root передає helpers зі workspace та викликає render після таблиці/основних форм.
+Завантажити файл до workspace або створювати фабрику ліниво після її появи.
+
+ui.card(title) додає section до main; ui.location() може повернути location object
+або ID; ui.items() — поточні stock rows із on_hand/reserved/available/balance_known.
+ui.busy() має охоплювати busy АБО pending. ui.command(path,payload,domain,validator)
+повертає run→{data}, validator отримує (data,savedPayload). ui.bind керує єдиним
+протоколом pending/retry; module не створює свого збереження, sessionStorage чи токенів.
+Після commit викликається ui.reload(), щоб показати актуальний стан, не receipt snapshot.
+
+Reserve: вибір матеріалу, категорії та доступної заявки із server list. Task selector
+спочатку порожній: користувач обирає заявку явно. Технічні UUID не показуються як текст.
+Заявки завантажуються після відкриття форми або кнопкою; category change і detached
+render мають окремі guards від застарілих GET-відповідей.
+
+Reservation list/history та issue list завантажуються ліниво кнопками,100 rows/page.
+Є release/issue-reservation із expected_version, підставою та поясненням.
+Partial return обирається з видач поточного складу; destination — тільки видимі
+locations із read+receipt. Немає ручного введення task/issue/reservation UUID.
+
+Кількості передаються decimal strings. Bounds/integrity перевіряються integer
+thousandths (BigInt), без floating-point. Локальний склад не обчислюється.
+Validators перевіряють UUID/identity/version/operation, receipt quantities й balances.
+Concurrent returns можуть змінити cumulative returned: перевіряється інваріант
+returned+returnable=issued, а не хибне припущення про незмінність старого snapshot.
+
+8 DOM/contract mock сценаріїв PASS, node syntax PASS. Браузер і live не запускались.
+Квитанція: WAREHOUSE_EXTENSION_UI_RESULT.json. Root має зробити незалежний review
+й інтегрований браузерний тест після підключення фабрики/API/resolver.

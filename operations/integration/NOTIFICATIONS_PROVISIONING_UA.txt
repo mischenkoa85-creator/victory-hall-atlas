@@ -1,0 +1,89 @@
+ЛОКАЛЬНО ПІДГОТОВЛЕНО. Цей файл не є квитанцією серверного застосування.
+
+Мета й точна ціль
+SQL008 після007; resolver010 після008/009. База victory_hall_green_dev,
+Unix socket /var/run/postgresql-victory-hall-green, порт55435.
+Release /opt/victory-hall-atlas-bff/releases/atlas-workforce-20261031.
+Python /opt/victory-hall-access/test-runtimes/atlas-session-29c45c9a02ff54c2/bin/python.
+BFF unit victory-hall-atlas-bff.service, існуючий OS user vh-atlas-bff uid986/gid978.
+Новий worker unit victory-hall-atlas-notification-worker.service, OS user/group
+vh-atlas-notify без інтерактивного входу. Не давати йому доступ до PGDATA або BFF secrets.
+
+Порядок для root-виконавця
+1. Використати чинну перевірену серію backup/restore, незалежний review точної
+   зміненої логіки та combined007–010 clone rehearsal. Звірити хеші й native DB
+   identity/head. На drift застосувати залежний review; не запускати старий пакет.
+2. Перед008 підготувати NOLOGIN vh_atlas_notification_worker із NOSUPERUSER,
+   NOBYPASSRLS, NOCREATEDB, NOCREATEROLE, NOREPLICATION, NOINHERIT. Окремий LOGIN
+   vh_atlas_notification_login має ті самі обмеження й NOINHERIT; лише членство
+   vh_atlas_notification_worker з можливістю SET ROLE. Жодного vh_owner/authn/
+   session_reader membership. CONNECT тільки до погодженої бази. Не змінювати
+   загальні PUBLIC grants як побічну дію цього пакета.
+3. Peer mapping — рівно один новий map без пароля:
+   pg_ident.conf: atlas_notification_worker vh-atlas-notify vh_atlas_notification_login
+   pg_hba.conf: local victory_hall_green_dev vh_atlas_notification_login peer map=atlas_notification_worker
+   HBA правило має стояти перед правилом, що перехоплює цей principal. Перевірити
+   pg_hba_file_rules/pg_ident_file_mappings, перезавантажити конфігурацію й довести
+   новий OS user → точний SQL principal; інші OS users не можуть скористатися map.
+   Не додавати host/trust/password fallback. Перевірити лише доступ до socket;
+   не давати групі читання даних PostgreSQL.
+4. Root створює /etc/victory-hall-atlas-notifications як root:root0700.
+   Native helper генерує ОДИН РАЗ vault.key:32 випадкові сирі байти й незалежний
+   P-256 ключ vapid.private.pem у PKCS8 PEM. Обидва root:root0600. vapid.public —
+   unpadded base64url65-byte uncompressed public point, root:root0644. Генерація
+   через exclusive/no-follow запис у новий каталог з атомарним завершенням.
+   Нічого не друкувати, не передавати через args/env і не включати до артефактів.
+   При наявних файлах перевірити формат/права/узгодженість пари, НЕ перегенерувати.
+   Неповний або неузгоджений набір — конкретна зупинка для відновлення. Не читати
+   й не повторно використовувати OIDC/session/authn ключ. Readback лише булеві
+   результати, власник, mode і факт правильного розміру; без вмісту/хешів секретів.
+5. Зберегти існуюче Python середовище. У новому release notification-extras
+   встановити додаткові pin з requirements-notifications.txt та потрібні imports
+   pywebpush (requests,aiohttp,py-vapid,http-ece) із зафіксованим install report.
+   Не виконувати pip upgrade існуючого BFF venv. Наявні cryptography/psycopg/
+   FastAPI не затіняти іншою версією через PYTHONPATH. Якщо їх версія відмінна
+   від локально перевіреної cryptography50.0.2 — залежний crypto/HTTP mock regression
+   на цій версії до активації; жодного автоматичного оновлення.
+6. Інтеграція BFF:
+   from notification_api import attach_notifications
+   from notification_runtime import load_bff_runtime
+   attach_notifications(app, repository, **load_bff_runtime())
+   LoadCredential drop-in notification-bff-credentials.conf.template завантажує
+   тільки vault і public VAPID; BFF не отримує приватний VAPID. CREDENTIALS_DIRECTORY
+   має бути /run/credentials/victory-hall-atlas-bff.service; reader перевіряє
+   regular file, власника, закритий mode, розмір і відсутність symlink.
+7. Worker template завантажує vault+VAPID private. make_worker() не робить жодного
+   SQL/HTTP на імпорті. main перевіряє OS user, прибирає PG* override без читання
+   значень, використовує лише фіксований peer connector/passfile=/dev/null.
+   SQLNotificationRepository додатково перевіряє NOINHERIT, непривілейований
+   SESSION_USER і відсутність vh_owner membership, робить SET LOCAL ROLE worker.
+8. Після008 канал webpush.available=false; email/telegram залишаютьсяfalse.
+   Коли key/dependency/unit/SQL readback пройдено, root у погодженій native
+   транзакції може встановити лише webpush.available=true з точним approval_reference.
+   Не змінювати notification_preferences, не створювати endpoint, не вимагати
+   браузерний дозвіл і не посилати тестових повідомлень від імені власника.
+   До/після довести, що owner requested flags не змінилися.
+9. Нова служба виводить лише configured/ready/stopped або санітизований enum,
+   job_id й HTTP status. Ready означає успішний SQL tick, а не push delivery.
+   Idle не спамить журнал. Повторний незмінний DB failure стишується; retry30s.
+   Передача HTTP має власний child із12s wall deadline, запас5s lease для finish;
+   systemd KillMode=control-group. Timeout/невідомий finish ніколи не означає
+   автоматичну повторну відправку. Контент, URL підписки й provider body не логувати.
+10. Опублікувати notification-sw.js рівно /atlas-reports-preview/notification-sw.js
+   з JavaScript MIME; HTTPS і scope /atlas-reports-preview/. Не створювати fetch
+   handler/cache. Підключити notification_client.js перед workforce_ui.js.
+   Реальний browser opt-in/ACK залишається окремим фактичним acceptance користувача.
+
+Вузькі worker SQL functions
+notification_enqueue(), notification_claim(uuid), notification_begin_dispatch(uuid,uuid),
+notification_finish(uuid,uuid,text,integer,integer), notification_job_status(uuid,uuid).
+Жодного прямого читання таблиць; додавання SELECT на endpoint/vault не потрібне.
+Worker не створює core.app_session і не звертається до authn connection.
+
+Залишкові межі
+Після COMMIT begin_dispatch рішення на доставку вже прийняте. Відкликання, що
+сталося після цього COMMIT, не може відкликати вже переданий generic push.
+Facility gate гарантує перевірку актуальних прав перед begin, приватний зміст
+не входить у payload, а відкриття кабінету й proof знову перевіряють поточний доступ.
+Provider accepted не дорівнює device displayed/read. Без браузерного opt-in та
+same-user ACK не оголошувати реальне push приймання завершеним.

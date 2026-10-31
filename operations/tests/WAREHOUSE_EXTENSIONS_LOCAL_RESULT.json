@@ -1,0 +1,15 @@
+{
+  "status": "LOCAL_CONTRACT_PASS_PG_PENDING",
+  "local_http_tests_passed": 24,
+  "sql_runtime_executed": false,
+  "server_actions": false,
+  "frozen001_006_unchanged": true,
+  "files": {
+    "sql/009_warehouse_reservations_candidate.sql": "2ba158d247af722b55a2eb4db1bb92ee484207eda73f698ee99663bb6ccdbc71",
+    "warehouse_extensions_api.py": "586901d513ddfee75f5c70c3d81d10e8618a4762e00306c9aa9dffe38f455e97",
+    "tests/build_warehouse_extensions.py": "6083158220f0008a0cb725c23ad83a750f9f084d762c419d31929d48d9141665",
+    "tests/test_warehouse_extensions_api.py": "8701087d62d61194cff15623ed0e734fa1bb288db9d9fba3dc7e589b4c17b5f9",
+    "tests/test_warehouse_extensions_pg.py": "bd782a9fd6eeadf7ba0c759d3b8042676709b72c3c299f1c9ea9a18e180b091c"
+  },
+  "next": "Independent root review and combined007-010 actual private-PG rehearsal"
+}

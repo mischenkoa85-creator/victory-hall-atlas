@@ -30,19 +30,20 @@
   const dialog=el('dialog'); dialog.setAttribute('aria-labelledby','ops-title');
   const header=el('header'),title=el('h1');title.id='ops-title';const close=el('button','×','close');close.type='button';close.setAttribute('aria-label','Закрити робочий кабінет');header.append(title,close);
   if(script.dataset.testMode==='true')header.prepend(el('span','Тестові дані','badge'));
-  const bar=el('nav',null,'bar');bar.setAttribute('aria-label','Робочі розділи');const stockTab=el('button','Склад'),boardTab=el('button','Правління'),who=el('span','Перевіряю вхід…','who'),refresh=el('button','Оновити');bar.append(stockTab,boardTab,who,refresh);
+  const bar=el('nav',null,'bar');bar.setAttribute('aria-label','Робочі розділи');const stockTab=el('button','Склад'),boardTab=el('button','Правління'),staffTab=el('button','Працівники'),notificationTab=el('button','Сповіщення'),who=el('span','Перевіряю вхід…','who'),refresh=el('button','Оновити');bar.append(stockTab,boardTab,staffTab,notificationTab,who,refresh);
   const status=el('p','','status');status.setAttribute('role','status');status.setAttribute('aria-live','polite');const main=el('main');dialog.append(header,bar,status,main);root.append(style,dialog);document.body.append(host);
-  let mode='warehouse',epoch=0,csrf=null,sessionUserId=null,context=null,busy=false,pending=null,locationId=null,categoryId=null,currentTask=null;
+  let mode='warehouse',epoch=0,csrf=null,sessionUserId=null,context=null,modeData=null,busy=false,pending=null,locationId=null,categoryId=null,currentTask=null;
+  const modes=new Set(['warehouse','board','staff','notifications']);
   const pendingStorageKey='atlas-operations-pending-v1:'+facility;
-  const receiptDomains=new Set(['warehouse','board','attachment','item','location','category']);
+  const receiptDomains=new Set(['warehouse','board','attachment','item','location','category','staff','team','preference','reservation']);
   function persistPending(){const r=pending?.receipt;if(!r||!receiptDomains.has(r.domain)||typeof r.key!=='string'||!r.key||r.key.length>128)throw new Error('Не вдалося підготувати безпечний повтор.');try{sessionStorage.setItem(pendingStorageKey,JSON.stringify({version:1,userId:pending.userId,facility,mode,domain:r.domain,key:r.key}));}catch{throw new Error('Браузер не дозволяє зберегти підтвердження операції. Спробуйте звичайний режим браузера.');}}
   function releasePending(){pending=null;try{sessionStorage.removeItem(pendingStorageKey)}catch{}}
   let stockRows=[],taskRows=[],historyBefore=null,taskBefore=null; const controllers=new Set();
   const names={new:'Нова',assigned:'Призначена',in_progress:'У роботі',declined:'Відхилена виконавцем',reported_done:'Очікує приймання',closed:'Виконано'};
-  const displayNames={...names,returned_for_rework:'На доопрацюванні'};
-  const audienceNames={assignee:'Виконавцю',creator:'Автору заявки',administrator:'Відповідальному'};
+  const displayNames={...names,returned_for_rework:'На доопрацюванні',offered_to_team:'У черзі групи'};
+  const audienceNames={assignee:'Виконавцю',creator:'Автору заявки',administrator:'Відповідальному',team:'Групі'};
   function taskStateName(row){const state=row.display_state||(row.action==='return_for_rework'?'returned_for_rework':row.new_status||row.status);return displayNames[state]||'Стан не визначено';}
-  const movementNames={opening:'Початковий залишок',receipt:'Надходження',issue:'Видача на роботу',transfer:'Переміщення',reversal:'Сторнування'};
+  const movementNames={opening:'Початковий залишок',receipt:'Надходження',issue:'Видача на роботу',transfer:'Переміщення',reversal:'Сторнування',return:'Повернення'};
   const units={pcs:'шт.',m:'м',kg:'кг',l:'л',set:'компл.'};
   const message=(text,bad=false)=>{status.textContent=text;status.className='status'+(bad?' error':'')};
   const date=t=>t?new Intl.DateTimeFormat('uk-UA',{dateStyle:'short',timeStyle:'short',timeZone:'Europe/Kyiv'}).format(new Date(t)):'Не вказано';
@@ -50,14 +51,14 @@
   const currentLocation=()=>context?.warehouse.locations.find(x=>x.location_id===locationId);
   const category=()=>context?.board.categories.find(x=>x.category_id===categoryId);
   function cancel(){epoch++;for(const c of controllers)c.abort();controllers.clear();}
-  function clear(){csrf=null;sessionUserId=null;context=null;stockRows=[];taskRows=[];currentTask=null;main.replaceChildren();who.textContent='Потрібен вхід';}
+  function clear(){csrf=null;sessionUserId=null;context=null;modeData=null;stockRows=[];taskRows=[];currentTask=null;main.replaceChildren();who.textContent='Потрібен вхід';}
   function authView(text='Увійдіть своїм обліковим записом.'){cancel();clear();message(text,true);const c=el('section',null,'card');const a=el('a','Увійти');a.href=server+'/block8-reporting/v1/auth/login';if(pending){a.target='_blank';a.rel='noopener noreferrer';c.append(el('p','Після входу поверніться до цієї вкладки й натисніть «Оновити», щоб перевірити незавершену операцію.','muted'));}else a.addEventListener('click',()=>{try{sessionStorage.setItem('atlas-next-workspace',mode)}catch{}});c.append(a);main.append(c);}
   async function api(path,{method='GET',body=null,headers={}}={}){
     const my=epoch,ctrl=new AbortController();controllers.add(ctrl);const timer=setTimeout(()=>ctrl.abort(),20000);
     try{
       if(!permitted)throw Object.assign(new Error('Відкрийте захищений Атлас на сервері.'),{status:403});
       const opts={method,credentials:'same-origin',cache:'no-store',redirect:'error',signal:ctrl.signal,headers:{...headers}};
-      if(method!=='GET'){if(!csrf||!context?.user_id||sessionUserId!==context.user_id||(pending&&context.user_id!==pending.userId)){authView('Для продовження увійдіть у той самий обліковий запис.');throw Object.assign(new Error('Потрібен підтверджений вхід.'),{status:401});}opts.headers['X-CSRF-Token']=csrf;}
+      if(method!=='GET'){if(!csrf||!context?.user_id||sessionUserId!==context.user_id||(pending&&context.user_id!==pending.userId)){authView('Для продовження увійдіть у той самий обліковий запис.');throw Object.assign(new Error('Потрібен підтверджений вхід.'),{status:401});}const aux=context.auxiliary_mode;if(aux&&path!=='/session/operations/'+facility+'/commands/resolve'&&(aux==='notifications'?!path.startsWith('/session/operations/'+facility+'/notifications/'):!new RegExp('^/session/operations/'+facility+'/(staff|teams)(/|$)').test(path)))throw new Error('Спочатку відкрийте відповідний робочий розділ.');opts.headers['X-CSRF-Token']=csrf;}
       if(body!==null){if(body instanceof Blob)opts.body=body;else{opts.body=JSON.stringify(body);opts.headers['Content-Type']='application/json';}}
       const response=await fetch(base+path,opts);const raw=await response.text();if(my!==epoch)throw new DOMException('Closed','AbortError');
       if(raw.length>2_000_000)throw new Error('Відповідь сервера завелика.');let data;try{data=JSON.parse(raw)}catch{data=null;}
@@ -99,8 +100,23 @@
     if(!valid)throw badAcknowledgement();return result;
   }
   function command(path,payload){const saved=JSON.parse(JSON.stringify(payload));const run=async()=>validateCommand(path,saved,await api(path,{method:'POST',body:saved}));const domain=path.endsWith('/movements')?'warehouse':path.endsWith('/items')?'item':path.includes('/warehouse/')&&path.endsWith('/locations')?'location':path.endsWith('/categories')?'category':'board';run.receipt={domain,key:saved.idempotency_key||saved.item_id||saved.location_id||saved.category_id};return run;}
+  function extensionCommand(path,payload,domain,validator){
+    if(!receiptDomains.has(domain)||!['warehouse','board','reservation','staff','team','preference'].includes(domain)||typeof validator!=='function'||!path.startsWith('/session/'))throw new Error('Неправильна операція.');
+    const saved=JSON.parse(JSON.stringify(payload));if(typeof saved.idempotency_key!=='string'||!saved.idempotency_key)throw new Error('Не підготовлено ключ операції.');
+    const run=async()=>{const response=await api(path,{method:'POST',body:saved});if(!validator(response.data,saved))throw badAcknowledgement();return response;};run.receipt={domain,key:saved.idempotency_key};return run;
+  }
   async function uploadPhoto(file,taskId,purpose,key){const r=await api('/session/attachments/'+facility+'/tasks/'+taskId+'?purpose='+purpose,{method:'POST',body:file,headers:{'Content-Type':file.type,'Idempotency-Key':key}});const d=r.data;if(!d||!uuid(d.attachment_id)||d.reference!=='atlas-photo:'+d.attachment_id||d.task_id!==taskId||d.uploaded_by!==context?.user_id||d.purpose!==purpose||!/^[a-f0-9]{64}$/.test(d.content_sha256||''))throw badAcknowledgement();return r;}
+  function renderBar(){title.textContent={warehouse:'Склад Victory Hall',board:'Кабінет правління',staff:'Працівники й групи',notifications:'Мої сповіщення'}[mode];for(const [m,b] of [['warehouse',stockTab],['board',boardTab],['staff',staffTab],['notifications',notificationTab]])b.setAttribute('aria-pressed',String(mode===m));}
+  let warehouseExtension=null,workforceExtension=null;
+  function extensionUI(){return {el,card,formBlock,field,select,check,button,bind,quantity,date,units,uuid,request:api,command:extensionCommand,context:()=>context,facility,location:currentLocation,items:()=>stockRows,reload:load,busy:()=>busy||!!pending,message,cancel,main,openTask,showSavedTask,open,openBoardTarget};}
+  async function openBoardTarget(taskId){if(busy||pending)return;const actor=context?.user_id;mode='board';await load();if(!context||context.user_id!==actor||context.auxiliary_mode)return;if(taskId)await openTask(taskId);else await workforce().renderQueue();}
+  function workforce(){if(!workforceExtension){if(typeof window.createAtlasWorkforceUI!=='function')throw new Error('Оновіть сторінку, щоб відкрити цей розділ.');workforceExtension=window.createAtlasWorkforceUI(extensionUI());}return workforceExtension;}
   async function loadContext(expectedUser=sessionUserId){
+    if(mode==='staff'||mode==='notifications'){
+      const suffix=mode==='staff'?'/staff':'/notifications/preferences';const data=(await api('/session/operations/'+facility+suffix)).data;
+      if(!data||data.user_id!==expectedUser||data.facility_id!==facility||(pending&&data.user_id!==pending.userId)){authView('Обліковий запис змінився. Увійдіть повторно.');throw new DOMException('Identity changed','AbortError');}
+      modeData=data;context={user_id:data.user_id,facility_id:facility,auxiliary_mode:mode,warehouse:{can_manage_catalog:false,locations:[]},board:{can_configure:false,categories:[]}};return;
+    }
     const response=await api('/session/operations/'+facility+'/context'),c=response.data;
     const actions=a=>Array.isArray(a)&&a.every(x=>typeof x==='string'&&x.length<=64);
     const valid=c&&uuid(c.user_id)&&c.facility_id===facility&&c.warehouse&&typeof c.warehouse.can_manage_catalog==='boolean'&&Array.isArray(c.warehouse.locations)&&c.warehouse.locations.every(x=>uuid(x.location_id)&&typeof x.label==='string'&&actions(x.actions))&&c.board&&typeof c.board.can_configure==='boolean'&&Array.isArray(c.board.categories)&&c.board.categories.every(x=>uuid(x.category_id)&&typeof x.label==='string'&&typeof x.review_required==='boolean'&&typeof x.allow_public==='boolean'&&actions(x.actions)&&Array.isArray(x.assignees)&&x.assignees.every(a=>uuid(a.user_id)&&a.self===(a.user_id===c.user_id)&&(a.label===null||typeof a.label==='string')));
@@ -109,14 +125,14 @@
   }
   async function load(){
     if(pending)return resumePending();
-    cancel();clear();message('Завантажую…');title.textContent=mode==='warehouse'?'Склад Victory Hall':'Кабінет правління';stockTab.setAttribute('aria-pressed',String(mode==='warehouse'));boardTab.setAttribute('aria-pressed',String(mode==='board'));
+    cancel();clear();message('Завантажую…');renderBar();
     if(!permitted){const c=card();const a=el('a','Відкрити захищений Атлас');a.href=server+'/atlas-reports-preview/';c.append(a);message('Робочі розділи доступні на сервері.');return;}
-    try{const me=await api('/me');if(typeof me.csrf_token!=='string'||!me.csrf_token||typeof me.user_id!=='string')throw new Error('Потрібен повторний вхід.');csrf=me.csrf_token;sessionUserId=me.user_id;await loadContext(me.user_id);who.textContent='Вхід підтверджено';message('');if(mode==='warehouse')await renderWarehouse();else await renderBoard();}
+    try{const me=await api('/me');if(typeof me.csrf_token!=='string'||!me.csrf_token||typeof me.user_id!=='string')throw new Error('Потрібен повторний вхід.');csrf=me.csrf_token;sessionUserId=me.user_id;await loadContext(me.user_id);who.textContent='Вхід підтверджено';message('');if(mode==='warehouse')await renderWarehouse();else if(mode==='board')await renderBoard();else if(mode==='staff')await workforce().renderStaff(modeData);else await workforce().renderNotifications(modeData);}
     catch(error){if(error.name!=='AbortError'){message(error.message,true);if(error.status===401)authView(error.message);}}
   }
   async function resumePending(){
     if(busy||!pending)return;cancel();clear();message('Перевіряю вхід для незавершеної операції…');
-    title.textContent=mode==='warehouse'?'Склад Victory Hall':'Кабінет правління';stockTab.setAttribute('aria-pressed',String(mode==='warehouse'));boardTab.setAttribute('aria-pressed',String(mode==='board'));
+    renderBar();
     try{
       const me=await api('/me');if(typeof me.user_id!=='string'||typeof me.csrf_token!=='string'||!me.csrf_token)throw new Error('Сервер повернув некоректну відповідь входу.');
       if(me.user_id!==pending.userId){authView('Увійдіть у той самий обліковий запис, з якого почали операцію.');return;}
@@ -155,8 +171,8 @@
     if(!locations.some(x=>x.location_id===locationId))locationId=locations[0].location_id;
     const picker=select(c,'Місце зберігання',locations.map(l=>[l.location_id,l.label]));picker.value=locationId;picker.addEventListener('change',()=>{if(busy||pending){picker.value=locationId;return;}locationId=picker.value;renderWarehouse().catch(e=>{if(e.name!=='AbortError')message(e.message,true)});});
     const response=await api('/session/warehouse/'+facility+'/locations/'+locationId+'/stock');stockRows=response.data;if(!Array.isArray(stockRows))throw new Error('Некоректний перелік матеріалів.');
-    const tableBox=el('div',null,'table'),table=el('table'),head=el('tr');for(const text of ['Матеріал','Залишок','Одиниця'])head.append(el('th',text));table.append(head);
-    for(const item of stockRows){const row=el('tr');row.append(el('td',item.label),el('td',item.balance_known?quantity(item.quantity):'Не встановлено','n'),el('td',units[item.unit]||item.unit));table.append(row);}tableBox.append(table);c.append(tableBox);
+    const tableBox=el('div',null,'table'),table=el('table'),head=el('tr');for(const text of ['Матеріал','На складі','У резерві','Вільно','Одиниця'])head.append(el('th',text));table.append(head);
+    for(const item of stockRows){const row=el('tr');row.append(el('td',item.label),el('td',item.balance_known?quantity(item.on_hand??item.quantity):'Не встановлено','n'),el('td',item.balance_known?quantity(item.reserved):'Не встановлено','n'),el('td',item.balance_known?quantity(item.available):'Не встановлено','n'),el('td',units[item.unit]||item.unit));table.append(row);}tableBox.append(table);c.append(tableBox);
     if(!stockRows.length)c.append(el('p','Матеріали ще не додані.','muted'));
     c.append(el('p','«Не встановлено» означає, що початковий залишок ще не підтверджено.','muted'));
     if(context.warehouse.can_manage_catalog){
@@ -171,18 +187,21 @@
         bind(f,'Зберегти операцію',()=>{const k=kind.value;if(k==='transfer'&&!to.value)throw new Error('Додайте інше місце зберігання.');const p={idempotency_key:crypto.randomUUID(),kind:k,item_id:item.value,quantity:amount.value.replace(',','.'),document_reference:doc.value.trim(),reason:reason.value.trim(),work_reference:work.value.trim()||null,object_reference:object.value.trim()||null};if(k==='opening'||k==='receipt')p.to_location=locationId;else p.from_location=locationId;if(k==='transfer')p.to_location=to.value;return command('/session/warehouse/'+facility+'/movements',p);},renderWarehouse);
       }
     }
+    if(typeof window.createAtlasWarehouseExtension==='function'){warehouseExtension ||= window.createAtlasWarehouseExtension(extensionUI());await warehouseExtension.render();}
     const history=card('Журнал руху');historyBefore=null;await warehouseHistory(history,false);
   }
   async function warehouseHistory(parent,append){
     if(!append)parent.append(el('p','Останні операції цього місця.','muted'));
     const rows=(await api('/session/warehouse/'+facility+'/locations/'+locationId+'/history?limit=50'+(historyBefore?'&before='+historyBefore:''))).data;if(!Array.isArray(rows))throw new Error('Некоректний журнал.');
     parent.querySelector('[data-more]')?.remove();for(const item of rows){const line=el('div',null,'row');const body=el('div');body.append(el('strong',movementNames[item.kind]||item.kind),el('div',date(item.created_at)+' · '+quantity(item.delta)+' · '+(stockRows.find(x=>x.item_id===item.item_id)?.label||'Матеріал')),el('div',item.reason,'muted'));line.append(body);parent.append(line);
-      if(currentLocation().actions.includes('warehouse.reverse')&&['receipt','issue','transfer'].includes(item.kind)){const f=formBlock(body,'Сторнувати операцію');const doc=field(f,'Підстава / документ','text',true),reason=field(f,'Причина сторнування','text',true);bind(f,'Підтвердити сторнування',()=>command('/session/warehouse/'+facility+'/movements',{idempotency_key:crypto.randomUUID(),kind:'reversal',item_id:item.item_id,quantity:null,reference_operation:item.operation_id,document_reference:doc.value,reason:reason.value}),renderWarehouse);}}
+      if(currentLocation().actions.includes('warehouse.reverse')&&['receipt','issue','transfer','return'].includes(item.kind)){const f=formBlock(body,'Сторнувати операцію');const doc=field(f,'Підстава / документ','text',true),reason=field(f,'Причина сторнування','text',true);bind(f,'Підтвердити сторнування',()=>command('/session/warehouse/'+facility+'/movements',{idempotency_key:crypto.randomUUID(),kind:'reversal',item_id:item.item_id,quantity:null,reference_operation:item.operation_id,document_reference:doc.value,reason:reason.value}),renderWarehouse);}}
     if(rows.length===50){historyBefore=rows.at(-1).entry_id;const more=button(parent,'Показати раніші',()=>warehouseHistory(parent,true));more.dataset.more='1';}else if(!append&&!rows.length)parent.append(el('p','Операцій поки немає.','muted'));
   }
   async function renderBoard(){
     cancel();
     main.replaceChildren();currentTask=null;taskBefore=null;taskRows=[];const c=card('Заявки та виконані роботи');
+    if(context.team_queue_available)button(c,'Черга моїх груп',()=>workforce().renderQueue());
+    if(context.can_manage_staff)button(c,'Працівники й групи',()=>open('staff'));
     if(context.board.can_configure){const f=formBlock(c,'Додати категорію робіт');const label=field(f,'Назва категорії','text',true);label.maxLength=240;const review=check(f,'Потрібне приймання відповідальним',true),publicAllowed=check(f,'Дозволяти видимі всім уповноваженим у категорії заявки');f.append(el('p','Ви будете відповідальним за цю категорію. Виконавець не може приймати власну роботу, якщо потрібна окрема перевірка.','muted'));bind(f,'Додати категорію',()=>command('/session/board/'+facility+'/categories',{category_id:crypto.randomUUID(),label:label.value.trim(),review_required:review.checked,allow_public:publicAllowed.checked}),async id=>{categoryId=id;await loadContext();await renderBoard();});}
     const categories=context.board.categories;if(!categories.length){c.append(el('p','Категорій робіт поки немає або до них не надано доступ.','muted'));return;}
     if(!categories.some(x=>x.category_id===categoryId))categoryId=categories[0].category_id;
@@ -214,19 +233,23 @@
       const f=formBlock(c,'Прийняти виконану роботу');const note=field(f,'Примітка відповідального');bind(f,'Прийняти роботу',()=>command(path,{...payload('close'),reason:note.value.trim()||null}),showSavedTask);
       const rework=formBlock(c,'Повернути на доопрацювання');const reason=field(rework,'Що потрібно виправити','textarea',true);reason.maxLength=2000;bind(rework,'Повернути виконавцю',()=>{if(!reason.value.trim())throw new Error('Поясніть, що потрібно виправити.');return command(path,{...payload('return_for_rework'),reason:reason.value.trim()});},showSavedTask);
     }
+    await workforce().renderTeamActions(c,task);
     const photos=card('Фото');await renderPhotos(photos,task);
     if(task.creator_id===context.user_id&&caps.includes('board.create')){const f=formBlock(photos,'Додати фото до заявки'),file=field(f,'Фото — JPG, PNG або WebP, до 5 МБ','file',true);file.accept='image/jpeg,image/png,image/webp';bind(f,'Додати фото',()=>{const selected=file.files[0];if(!selected||selected.size>5*1024*1024)throw new Error('Фото повинно бути до 5 МБ.');const key=crypto.randomUUID(),run=()=>uploadPhoto(selected,task.task_id,'request',key);run.receipt={domain:'attachment',key};return run;},()=>openTask(task.task_id));}
     const history=card('Історія заявки');await taskHistory(history,task.task_id,null);
   }
   async function renderPhotos(parent,task){const rows=(await api('/session/attachments/'+facility+'/tasks/'+task.task_id+'?limit=100')).data;if(!Array.isArray(rows))throw new Error('Некоректний список фото.');if(!rows.length)parent.append(el('p','Фото поки немає.','muted'));for(const photo of rows){const link=el('a',(photo.purpose==='completion'?'Виконання':'До заявки')+' · '+date(photo.created_at));link.href=base+'/session/attachments/'+facility+'/files/'+encodeURIComponent(photo.attachment_id);link.target='_blank';link.rel='noopener noreferrer';const row=el('p');row.append(link);parent.append(row);}}
   async function taskHistory(parent,id,before){const rows=(await api('/session/board/'+facility+'/tasks/'+id+'/history?limit=50'+(before?'&before_version='+before:''))).data;if(!Array.isArray(rows))throw new Error('Некоректна історія.');parent.querySelector('[data-more]')?.remove();for(const r of rows){const line=el('p',taskStateName(r)+' · '+date(r.event_at));if(r.details?.reason)line.append(el('small',' — '+r.details.reason));parent.append(line);}if(rows.length===50){const b=button(parent,'Раніші події',()=>taskHistory(parent,id,rows.at(-1).task_version));b.dataset.more='1';}}
-  async function showNotifications(){cancel();main.replaceChildren();button(main,'← До журналу',renderBoard);const c=card('Мої сповіщення');async function page(before){const query='?limit=50'+(before?'&before_created='+encodeURIComponent(before.created_at)+'&before_notification='+before.notification_id:'');const rows=(await api('/session/board/notifications'+query)).data;if(!Array.isArray(rows))throw new Error('Некоректні сповіщення.');c.querySelector('[data-more]')?.remove();for(const r of rows){button(c,taskStateName(r)+' · '+date(r.created_at)+' · '+(audienceNames[r.audience]||'Сповіщення'),()=>openTask(r.task_id),'task');}if(rows.length===50){const b=button(c,'Раніші сповіщення',()=>page(rows.at(-1)));b.dataset.more='1';}else if(!before&&!rows.length)c.append(el('p','Сповіщень поки немає.','muted'));}await page(null);}
+  async function showNotifications(){open('notifications');}
   function closePanel(){if(busy||pending){message('Спочатку перевірте незавершену операцію.');return;}cancel();clear();dialog.close();}
-  function open(next){if(busy||pending){message('Спочатку перевірте незавершену операцію.');return;}if(!['warehouse','board'].includes(next))return;mode=next;const reports=document.getElementById('vh-report-panel')?.shadowRoot;reports?.getElementById('panel-close')?.click();if(document.getElementById('eng')?.classList.contains('open'))document.getElementById('engx')?.click();if(!dialog.open)dialog.showModal();load();}
-  close.addEventListener('click',closePanel);dialog.addEventListener('cancel',e=>{e.preventDefault();closePanel();});dialog.addEventListener('close',()=>{cancel();clear();});dialog.addEventListener('keydown',e=>e.stopPropagation());stockTab.addEventListener('click',()=>open('warehouse'));boardTab.addEventListener('click',()=>open('board'));refresh.addEventListener('click',()=>{if(!busy)load();});
+  function open(next){if(busy||pending){message('Спочатку перевірте незавершену операцію.');return;}if(!modes.has(next))return;mode=next;const reports=document.getElementById('vh-report-panel')?.shadowRoot;reports?.getElementById('panel-close')?.click();if(document.getElementById('eng')?.classList.contains('open'))document.getElementById('engx')?.click();if(!dialog.open)dialog.showModal();load();}
+  close.addEventListener('click',closePanel);dialog.addEventListener('cancel',e=>{e.preventDefault();closePanel();});dialog.addEventListener('close',()=>{cancel();clear();});dialog.addEventListener('keydown',e=>e.stopPropagation());stockTab.addEventListener('click',()=>open('warehouse'));boardTab.addEventListener('click',()=>open('board'));staffTab.addEventListener('click',()=>open('staff'));notificationTab.addEventListener('click',()=>open('notifications'));refresh.addEventListener('click',()=>{if(!busy)load();});
   window.addEventListener('pagehide',()=>{cancel();clear();});
   window.addEventListener('beforeunload',event=>{if(busy||pending){event.preventDefault();event.returnValue='';}});
   document.addEventListener('visibilitychange',async()=>{if(document.hidden||!dialog.open||busy||!context)return;try{const me=await api('/me'),expected=pending?.userId||context.user_id;if(me.user_id!==expected||context.user_id!==expected){authView('Обліковий запис змінився. Увійдіть повторно.');return;}if(typeof me.csrf_token!=='string'||!me.csrf_token)throw new Error('Не вдалося перевірити вхід.');csrf=me.csrf_token;sessionUserId=me.user_id;}catch(e){if(e.name!=='AbortError')message(e.message,true);}});
   window.AtlasOperations={open};document.dispatchEvent(new Event('atlas:operations-ready'));
-  let attempts=0;function ready(){if(!window.P00?.ui){if(++attempts<200)setTimeout(ready,150);return;}window.P00.ui.register({name:'operations',own:true,open:()=>dialog.open,close:closePanel});let next;try{const saved=JSON.parse(sessionStorage.getItem(pendingStorageKey)||'null');if(saved?.version===1&&saved.facility===facility&&uuid(saved.userId)&&receiptDomains.has(saved.domain)&&typeof saved.key==='string'&&saved.key.length>0&&saved.key.length<=128&&['warehouse','board'].includes(saved.mode)){pending={userId:saved.userId,receipt:{domain:saved.domain,key:saved.key},uncertain:true,run:null};mode=saved.mode;dialog.showModal();resumePending();return;}next=sessionStorage.getItem('atlas-next-workspace');sessionStorage.removeItem('atlas-next-workspace');}catch{}if(['warehouse','board'].includes(next))open(next);}ready();
+  document.addEventListener('atlas-open-notifications',event=>{if(!event.detail?.facility_id||event.detail.facility_id===facility)open('notifications');});
+  document.addEventListener('atlas-notification-settings-changed',event=>{if(mode==='notifications'&&dialog.open&&!busy&&!pending&&(!event.detail?.facility_id||event.detail.facility_id===facility))load();});
+  window.AtlasNotificationClient?.attachEvents();
+  let attempts=0;function ready(){if(!window.P00?.ui){if(++attempts<200)setTimeout(ready,150);return;}window.P00.ui.register({name:'operations',own:true,open:()=>dialog.open,close:closePanel});let next;try{const saved=JSON.parse(sessionStorage.getItem(pendingStorageKey)||'null');if(saved?.version===1&&saved.facility===facility&&uuid(saved.userId)&&receiptDomains.has(saved.domain)&&typeof saved.key==='string'&&saved.key.length>0&&saved.key.length<=128&&modes.has(saved.mode)){pending={userId:saved.userId,receipt:{domain:saved.domain,key:saved.key},uncertain:true,run:null};mode=saved.mode;dialog.showModal();resumePending();return;}next=sessionStorage.getItem('atlas-next-workspace');sessionStorage.removeItem('atlas-next-workspace');}catch{}if(modes.has(next))open(next);}ready();
 })();

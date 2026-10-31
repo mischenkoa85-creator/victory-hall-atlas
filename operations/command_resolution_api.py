@@ -16,7 +16,7 @@ from bff.security import mutation_secret
 class ResolutionConflict(ServiceUnavailable):pass
 class ResolveCommand(BaseModel):
     model_config=ConfigDict(extra='forbid')
-    domain:Literal['warehouse','board','attachment','item','location','category']
+    domain:Literal['warehouse','board','attachment','item','location','category','staff','team','preference','reservation']
     key:str=Field(min_length=1,max_length=128)
     @model_validator(mode='after')
     def catalog_uuid(self):

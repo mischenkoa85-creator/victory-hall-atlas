@@ -1,0 +1,16 @@
+{
+  "status": "PASS_WAREHOUSE_UI_DOM_MOCK",
+  "cases": [
+    "lazy scoped task choice, literal text, UUIDs hidden, reserve identity/version validation and fresh reload",
+    "thousandth bounds remain exact at fifteen-digit magnitude",
+    "late category response cannot repopulate old task choices",
+    "late detached-view response cannot expose stale reservation details",
+    "issue reservation uses exact decimal and checks reservation version/operation acknowledgement",
+    "partial return targets visible issue, exact string payload, concurrent returns tolerated without false snapshot arithmetic",
+    "manual pages are capped at100 and use the last server cursor",
+    "missing capabilities/tasks leave honest empty state, no manual UUID entry or fabricated stock"
+  ],
+  "workspace_extension_sha256": "a01962ab85be6bc77c7bf8630238a9d12a2d007d4df28c4ceeaf2e7d08ff23d1",
+  "browser_executed": false,
+  "database_executed": false
+}
